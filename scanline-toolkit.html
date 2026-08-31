@@ -1,0 +1,1861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Scanline — QR &amp; Barcode Toolkit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================= RESET & TOKENS ============================= */
+*,*::before,*::after{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-sans);
+  -webkit-font-smoothing:antialiased;
+}
+:root{
+  --paper:#F5F4EF;
+  --surface:#FFFFFF;
+  --ink:#181A1E;
+  --ink-soft:#5B5E64;
+  --ink-faint:#93959B;
+  --line:#DDD9CE;
+  --line-strong:#C7C1B2;
+  --accent:#D6402E;
+  --accent-hover:#BC3423;
+  --accent-soft:#FBE4E0;
+  --teal:#177C6F;
+  --teal-soft:#DEEFEA;
+  --amber:#9C6B0B;
+  --amber-soft:#F6E8CE;
+  --radius-s:6px;
+  --radius-m:12px;
+  --radius-l:20px;
+  --shadow-card:0 1px 2px rgba(24,26,30,0.07), 0 6px 16px -10px rgba(24,26,30,0.18);
+  --font-sans:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+  --sidebar-w:236px;
+  --tabbar-h:64px;
+}
+h1,h2,h3,p{ margin:0; }
+button{ font-family:inherit; }
+input,select,textarea{ font-family:inherit; font-size:14px; color:var(--ink); }
+a{ color:inherit; }
+::selection{ background:var(--accent-soft); }
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+
+/* ============================= LAYOUT ============================= */
+.app{
+  display:grid;
+  grid-template-columns:var(--sidebar-w) 1fr;
+  min-height:100vh;
+}
+.sidebar{
+  background:var(--surface);
+  border-right:1px solid var(--line);
+  padding:24px 16px;
+  display:flex;
+  flex-direction:column;
+  gap:28px;
+  position:sticky;
+  top:0;
+  height:100vh;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:0 8px;
+}
+.brand-mark{
+  width:32px; height:32px;
+  border-radius:8px;
+  background:var(--ink);
+  display:grid;
+  place-items:center;
+  flex:none;
+}
+.brand-mark svg{ width:18px; height:18px; }
+.brand-text{ line-height:1.15; }
+.brand-text strong{ font-size:15px; font-weight:600; display:block; }
+.brand-text span{ font-size:11px; color:var(--ink-faint); letter-spacing:.02em; }
+
+.nav{ display:flex; flex-direction:column; gap:2px; }
+.nav-item{
+  display:flex; align-items:center; gap:12px;
+  padding:10px 12px;
+  border:none; background:transparent;
+  border-radius:var(--radius-s);
+  color:var(--ink-soft);
+  font-size:14px; font-weight:500;
+  cursor:pointer;
+  text-align:left;
+  transition:background .15s ease, color .15s ease;
+}
+.nav-item svg{ width:18px; height:18px; flex:none; opacity:.85; }
+.nav-item:hover{ background:var(--paper); color:var(--ink); }
+.nav-item.active{ background:var(--ink); color:#fff; }
+.nav-item.active svg{ opacity:1; }
+
+.sidebar-foot{
+  margin-top:auto;
+  padding:12px 8px 0;
+  border-top:1px solid var(--line);
+  font-size:11.5px;
+  color:var(--ink-faint);
+  line-height:1.5;
+}
+
+.main{ min-width:0; padding-bottom:40px; }
+.topbar{
+  padding:28px 36px 8px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.topbar h1{ font-size:22px; font-weight:600; letter-spacing:-.01em; }
+.topbar p{ font-size:13.5px; color:var(--ink-soft); max-width:62ch; }
+
+.panel{ display:none; padding:20px 36px 8px; }
+.panel.active{ display:block; }
+
+.workbench{
+  display:grid;
+  grid-template-columns:minmax(300px,380px) 1fr;
+  gap:22px;
+  align-items:start;
+}
+
+/* ============================= CARD ============================= */
+.card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--radius-l);
+  padding:22px;
+  box-shadow:var(--shadow-card);
+}
+.card + .card{ margin-top:18px; }
+.card-title{
+  font-size:13px;
+  font-weight:600;
+  color:var(--ink);
+  margin-bottom:14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+/* ============================= FORM ELEMENTS ============================= */
+.field{ margin-bottom:16px; }
+.field:last-child{ margin-bottom:0; }
+.field-label{
+  display:flex; align-items:baseline; justify-content:space-between;
+  font-size:12.5px; font-weight:500; color:var(--ink-soft);
+  margin-bottom:6px;
+}
+.field-label .hint-val{ font-family:var(--font-mono); font-size:11.5px; color:var(--ink-faint); }
+.field-sub{ font-size:11.5px; color:var(--ink-faint); margin-top:5px; line-height:1.4; }
+
+.input, .select, .textarea{
+  width:100%;
+  padding:9px 11px;
+  border:1px solid var(--line-strong);
+  border-radius:var(--radius-s);
+  background:var(--paper);
+  color:var(--ink);
+  transition:border-color .12s ease, background .12s ease;
+}
+.input:focus, .select:focus, .textarea:focus{
+  border-color:var(--ink);
+  background:var(--surface);
+}
+.textarea{ resize:vertical; min-height:76px; line-height:1.5; }
+.mono-input{ font-family:var(--font-mono); font-size:13px; }
+
+.field-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+.range-row{ display:flex; align-items:center; gap:10px; }
+input[type="range"]{
+  -webkit-appearance:none; appearance:none;
+  width:100%; height:4px;
+  background:var(--line-strong);
+  border-radius:2px;
+  outline:none;
+}
+input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:15px; height:15px; border-radius:50%;
+  background:var(--ink);
+  border:2px solid var(--surface);
+  box-shadow:0 0 0 1px var(--line-strong);
+  cursor:pointer;
+}
+input[type="range"]::-moz-range-thumb{
+  width:15px; height:15px; border-radius:50%;
+  background:var(--ink); border:2px solid var(--surface);
+  box-shadow:0 0 0 1px var(--line-strong); cursor:pointer;
+}
+
+.color-row{ display:flex; align-items:center; gap:10px; }
+input[type="color"]{
+  -webkit-appearance:none; appearance:none;
+  width:34px; height:34px; padding:0;
+  border:1px solid var(--line-strong); border-radius:8px;
+  background:none; cursor:pointer;
+}
+input[type="color"]::-webkit-color-swatch-wrapper{ padding:2px; }
+input[type="color"]::-webkit-color-swatch{ border-radius:6px; border:none; }
+.color-label{ font-family:var(--font-mono); font-size:12px; color:var(--ink-soft); text-transform:uppercase; }
+
+.checkbox-row{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-soft); }
+.checkbox-row input{ width:16px; height:16px; accent-color:var(--ink); }
+
+/* segmented control */
+.seg{
+  display:flex;
+  background:var(--paper);
+  border:1px solid var(--line-strong);
+  border-radius:var(--radius-s);
+  padding:3px;
+  gap:2px;
+  flex-wrap:wrap;
+}
+.seg-btn{
+  flex:1;
+  border:none; background:transparent;
+  padding:7px 10px;
+  font-size:12.5px; font-weight:500;
+  color:var(--ink-soft);
+  border-radius:5px;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:background .12s ease, color .12s ease;
+}
+.seg-btn:hover{ color:var(--ink); }
+.seg-btn.active{ background:var(--ink); color:#fff; }
+
+/* buttons */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  border-radius:var(--radius-s);
+  border:1px solid transparent;
+  padding:10px 16px;
+  font-size:13.5px; font-weight:600;
+  cursor:pointer;
+  transition:background .12s ease, border-color .12s ease, opacity .12s ease, transform .05s ease;
+  white-space:nowrap;
+}
+.btn:active{ transform:translateY(1px); }
+.btn svg{ width:15px; height:15px; }
+.btn-primary{ background:var(--accent); color:#fff; }
+.btn-primary:hover{ background:var(--accent-hover); }
+.btn-secondary{ background:var(--surface); color:var(--ink); border-color:var(--line-strong); }
+.btn-secondary:hover{ border-color:var(--ink); }
+.btn-ghost{ background:transparent; color:var(--ink-soft); border-color:transparent; }
+.btn-ghost:hover{ color:var(--ink); background:var(--paper); }
+.btn-danger{ background:transparent; color:var(--accent); border-color:var(--accent-soft); }
+.btn-danger:hover{ background:var(--accent-soft); }
+.btn-sm{ padding:7px 12px; font-size:12.5px; }
+.btn:disabled, .btn.disabled{ opacity:.4; cursor:not-allowed; pointer-events:none; }
+.btn-row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; }
+
+/* ============================= PREVIEW / LABEL CARD ============================= */
+.preview-card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--radius-l);
+  box-shadow:var(--shadow-card);
+  padding:28px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:18px;
+  min-height:420px;
+  position:relative;
+}
+.reg-mark{ position:absolute; width:16px; height:16px; opacity:.35; }
+.reg-mark::before, .reg-mark::after{ content:""; position:absolute; background:var(--ink); }
+.reg-mark::before{ width:100%; height:1px; top:50%; left:0; }
+.reg-mark::after{ width:1px; height:100%; left:50%; top:0; }
+.reg-mark.tl{ top:14px; left:14px; }
+.reg-mark.tr{ top:14px; right:14px; }
+.reg-mark.bl{ bottom:14px; left:14px; }
+.reg-mark.br{ bottom:14px; right:14px; }
+
+.preview-stage{
+  flex:1;
+  width:100%;
+  display:flex; align-items:center; justify-content:center;
+  min-height:280px;
+}
+.preview-stage canvas, .preview-stage svg{ max-width:100%; height:auto; border-radius:4px; }
+.empty-state{
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  color:var(--ink-faint); text-align:center; max-width:240px;
+}
+.empty-state svg{ width:38px; height:38px; opacity:.5; margin-bottom:4px; }
+.empty-title{ font-size:13.5px; font-weight:600; color:var(--ink-soft); }
+.empty-sub{ font-size:12px; line-height:1.5; }
+
+.preview-meta{
+  font-family:var(--font-mono);
+  font-size:11.5px;
+  color:var(--ink-faint);
+}
+.error-box{
+  display:none;
+  background:var(--accent-soft);
+  color:var(--accent-hover);
+  border-radius:var(--radius-s);
+  padding:10px 12px;
+  font-size:12.5px;
+  line-height:1.5;
+  width:100%;
+}
+
+/* ============================= HISTORY STRIP ============================= */
+.history-wrap{ margin-top:18px; }
+.history-head{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:10px;
+}
+.history-head h3{ font-size:12.5px; font-weight:600; color:var(--ink-soft); }
+.history-track{
+  display:flex; gap:10px;
+  overflow-x:auto;
+  padding-bottom:4px;
+}
+.history-item{
+  position:relative;
+  flex:none;
+  width:64px; height:64px;
+  border:1px solid var(--line);
+  border-radius:var(--radius-s);
+  background:var(--surface);
+  cursor:pointer;
+  overflow:hidden;
+}
+.history-item img{ width:100%; height:100%; object-fit:contain; padding:6px; }
+.history-remove{
+  position:absolute; top:2px; right:2px;
+  width:16px; height:16px;
+  border-radius:50%;
+  border:none; background:rgba(24,26,30,.75); color:#fff;
+  font-size:11px; line-height:1;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.history-empty{ font-size:12px; color:var(--ink-faint); }
+
+/* ============================= SCANNER ============================= */
+.scan-grid{ display:grid; grid-template-columns:1fr 320px; gap:22px; align-items:start; }
+.viewfinder-wrap{
+  position:relative;
+  background:#0F1013;
+  border-radius:var(--radius-l);
+  overflow:hidden;
+  aspect-ratio:4/3;
+  display:flex; align-items:center; justify-content:center;
+}
+.viewfinder-wrap video{ width:100%; height:100%; object-fit:cover; }
+.scan-idle{
+  color:#B7B9C0; display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center; padding:20px;
+}
+.scan-idle svg{ width:40px; height:40px; opacity:.7; }
+.viewfinder{
+  display:none;
+  position:absolute; inset:0;
+  pointer-events:none;
+}
+.vf-frame{
+  position:absolute; top:12%; left:14%; right:14%; bottom:12%;
+  border-radius:14px;
+}
+.vf-corner{ position:absolute; width:26px; height:26px; border:3px solid var(--accent); opacity:.9; }
+.vf-corner.tl{ top:0; left:0; border-right:none; border-bottom:none; border-top-left-radius:10px; }
+.vf-corner.tr{ top:0; right:0; border-left:none; border-bottom:none; border-top-right-radius:10px; }
+.vf-corner.bl{ bottom:0; left:0; border-right:none; border-top:none; border-bottom-left-radius:10px; }
+.vf-corner.br{ bottom:0; right:0; border-left:none; border-top:none; border-bottom-right-radius:10px; }
+.vf-scanline{
+  position:absolute; left:4%; right:4%; height:2px;
+  background:linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation:scanmove 2.1s ease-in-out infinite;
+  box-shadow:0 0 8px 1px var(--accent);
+}
+@keyframes scanmove{
+  0%{ top:6%; } 50%{ top:94%; } 100%{ top:6%; }
+}
+.viewfinder.success .vf-corner{ border-color:var(--teal); }
+.viewfinder.success .vf-scanline{ background:linear-gradient(90deg, transparent, var(--teal), transparent); box-shadow:0 0 10px 2px var(--teal); }
+
+.scan-controls{ display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; align-items:center; }
+.scan-result-panel{
+  display:none;
+  margin-top:16px;
+}
+.scan-result-text{
+  font-family:var(--font-mono);
+  font-size:13px;
+  background:var(--paper);
+  border:1px solid var(--line);
+  border-radius:var(--radius-s);
+  padding:12px;
+  word-break:break-word;
+  max-height:120px;
+  overflow-y:auto;
+}
+.scan-result-actions{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+
+.scan-history-row{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:9px 4px;
+  border-bottom:1px solid var(--line);
+  cursor:pointer;
+  font-size:12.5px;
+}
+.scan-history-row:hover{ background:var(--paper); }
+.scan-history-row:last-child{ border-bottom:none; }
+.truncate{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:190px; }
+.scan-time{ color:var(--ink-faint); font-size:11px; flex:none; }
+
+/* ============================= BATCH ============================= */
+.batch-summary{
+  display:none;
+  align-items:center; gap:14px;
+  margin-bottom:14px;
+  font-size:12.5px;
+}
+.pill{ display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; font-weight:600; }
+.pill-ok{ background:var(--teal-soft); color:var(--teal); }
+.pill-bad{ background:var(--accent-soft); color:var(--accent-hover); }
+.invalid-list{ max-height:130px; overflow-y:auto; margin-bottom:14px; }
+.invalid-row{
+  display:flex; justify-content:space-between; gap:10px;
+  padding:7px 0; border-bottom:1px solid var(--line);
+  font-size:12px;
+}
+.invalid-row .invalid-reason{ color:var(--accent-hover); flex:none; text-align:right; max-width:55%; }
+.progress-wrap{ display:none; margin:14px 0; }
+.progress-track{ height:6px; background:var(--line); border-radius:4px; overflow:hidden; }
+.progress-bar{ height:100%; width:0%; background:var(--ink); transition:width .2s ease; }
+.progress-label{ font-size:11.5px; color:var(--ink-faint); margin-top:6px; font-family:var(--font-mono); }
+
+.batch-results{ display:none; margin-top:20px; }
+.batch-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(110px,1fr));
+  gap:10px;
+  margin-top:12px;
+}
+.batch-cell{
+  position:relative;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--radius-s);
+  padding:8px;
+  text-align:center;
+}
+.batch-cell img{ width:100%; height:auto; }
+.batch-cell-label{ font-size:10.5px; color:var(--ink-soft); margin-top:6px; word-break:break-word; font-family:var(--font-mono); }
+.batch-cell-error{ font-size:11px; color:var(--accent); padding:20px 0; }
+.batch-cell-remove{
+  position:absolute; top:4px; right:4px;
+  width:18px; height:18px; border-radius:50%;
+  border:none; background:rgba(24,26,30,.7); color:#fff; font-size:12px; line-height:1;
+  cursor:pointer;
+}
+
+/* ============================= TOASTS ============================= */
+.toast-stack{
+  position:fixed; bottom:20px; right:20px;
+  display:flex; flex-direction:column; gap:8px;
+  z-index:200;
+}
+.toast{
+  background:var(--ink); color:#fff;
+  padding:11px 16px; border-radius:var(--radius-s);
+  font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,.18);
+  opacity:0; transform:translateY(8px);
+  transition:opacity .2s ease, transform .2s ease;
+  max-width:320px;
+}
+.toast.show{ opacity:1; transform:translateY(0); }
+.toast-success{ background:var(--teal); }
+.toast-error{ background:var(--accent-hover); }
+
+/* ============================= MOBILE TAB BAR ============================= */
+.tabbar{
+  display:none;
+  position:fixed; bottom:0; left:0; right:0;
+  height:var(--tabbar-h);
+  background:var(--surface);
+  border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom);
+  z-index:150;
+}
+.tabbar-inner{ display:flex; height:64px; }
+.tab-item{
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  border:none; background:none; color:var(--ink-faint);
+  font-size:10.5px; font-weight:500;
+  cursor:pointer;
+}
+.tab-item svg{ width:20px; height:20px; }
+.tab-item.active{ color:var(--accent); }
+
+/* ============================= RESPONSIVE ============================= */
+@media (max-width: 900px){
+  .app{ grid-template-columns:1fr; }
+  .sidebar{ display:none; }
+  .tabbar{ display:block; }
+  .main{ padding-bottom:calc(var(--tabbar-h) + 24px); }
+  .workbench, .scan-grid{ grid-template-columns:1fr; }
+  .topbar, .panel{ padding-left:18px; padding-right:18px; }
+  .field-grid{ grid-template-columns:1fr; }
+}
+@media (prefers-reduced-motion: reduce){
+  .vf-scanline{ animation:none; top:50%; }
+  .toast{ transition:none; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ============================= SIDEBAR (desktop) ============================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" stroke="white" stroke-width="2"/><rect x="14" y="3" width="7" height="7" stroke="white" stroke-width="2"/><rect x="3" y="14" width="7" height="7" stroke="white" stroke-width="2"/><rect x="15" y="15" width="2" height="2" fill="white"/><rect x="19" y="15" width="2" height="2" fill="white"/><rect x="15" y="19" width="2" height="2" fill="white"/><rect x="19" y="19" width="2" height="2" fill="white"/></svg>
+      </div>
+      <div class="brand-text">
+        <strong>Scanline</strong>
+        <span>QR &amp; Barcode Toolkit</span>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-section="generate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14v3M14 19h3v2M19 19h2"/></svg>
+        Generate QR
+      </button>
+      <button class="nav-item" data-section="scan">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V5a1 1 0 011-1h3M20 8V5a1 1 0 00-1-1h-3M4 16v3a1 1 0 001 1h3M20 16v3a1 1 0 01-1 1h-3M2 12h20" stroke-linecap="round"/></svg>
+        Scan QR
+      </button>
+      <button class="nav-item" data-section="barcode">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5v14M8 5v14M11 5v14M15 5v14M17 5v14M20 5v14"/></svg>
+        Generate Barcode
+      </button>
+      <button class="nav-item" data-section="batch">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+        Batch Run
+      </button>
+    </nav>
+    <div class="sidebar-foot">
+      Files are generated in your browser and saved to your device — nothing is uploaded anywhere.
+    </div>
+  </aside>
+
+  <!-- ============================= MAIN ============================= -->
+  <main class="main">
+
+    <!-- ---------- SECTION: GENERATE QR ---------- -->
+    <section id="section-generate" class="panel active">
+      <div class="topbar">
+        <h1>Generate a QR code</h1>
+        <p>Build a QR code for text, a link, Wi-Fi credentials, a contact card, or an email — with a live preview as you type.</p>
+      </div>
+
+      <div class="workbench">
+        <!-- Controls -->
+        <div id="qrForm">
+          <div class="card">
+            <div class="card-title">Content</div>
+            <div class="seg qr-type-seg" style="margin-bottom:16px;">
+              <button class="seg-btn active" data-type="text">Text</button>
+              <button class="seg-btn" data-type="url">URL</button>
+              <button class="seg-btn" data-type="wifi">Wi-Fi</button>
+              <button class="seg-btn" data-type="vcard">Contact</button>
+              <button class="seg-btn" data-type="email">Email</button>
+            </div>
+
+            <div class="qr-field-group" data-group="text" style="display:grid;">
+              <div class="field">
+                <label class="field-label" for="qrText">Text</label>
+                <textarea id="qrText" class="textarea" placeholder="Type anything you want encoded…"></textarea>
+              </div>
+            </div>
+
+            <div class="qr-field-group" data-group="url" style="display:none;">
+              <div class="field">
+                <label class="field-label" for="qrUrl">Website URL</label>
+                <input id="qrUrl" class="input mono-input" placeholder="example.com/menu" />
+                <div class="field-sub">https:// is added automatically if you leave it out.</div>
+              </div>
+            </div>
+
+            <div class="qr-field-group" data-group="wifi" style="display:none;">
+              <div class="field">
+                <label class="field-label" for="wifiSsid">Network name (SSID)</label>
+                <input id="wifiSsid" class="input" placeholder="Home Wi-Fi" />
+              </div>
+              <div class="field-grid">
+                <div class="field">
+                  <label class="field-label" for="wifiEnc">Security</label>
+                  <select id="wifiEnc" class="select">
+                    <option value="WPA">WPA / WPA2</option>
+                    <option value="WEP">WEP</option>
+                    <option value="nopass">None</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label class="field-label" for="wifiPass">Password</label>
+                  <input id="wifiPass" class="input" placeholder="••••••••" />
+                </div>
+              </div>
+              <label class="checkbox-row"><input type="checkbox" id="wifiHidden" /> Hidden network</label>
+            </div>
+
+            <div class="qr-field-group" data-group="vcard" style="display:none;">
+              <div class="field-grid">
+                <div class="field"><label class="field-label" for="vFirst">First name</label><input id="vFirst" class="input" /></div>
+                <div class="field"><label class="field-label" for="vLast">Last name</label><input id="vLast" class="input" /></div>
+              </div>
+              <div class="field"><label class="field-label" for="vOrg">Organization</label><input id="vOrg" class="input" /></div>
+              <div class="field-grid">
+                <div class="field"><label class="field-label" for="vPhone">Phone</label><input id="vPhone" class="input" /></div>
+                <div class="field"><label class="field-label" for="vEmail">Email</label><input id="vEmail" class="input" /></div>
+              </div>
+              <div class="field"><label class="field-label" for="vWebsite">Website</label><input id="vWebsite" class="input" /></div>
+            </div>
+
+            <div class="qr-field-group" data-group="email" style="display:none;">
+              <div class="field"><label class="field-label" for="emlTo">To</label><input id="emlTo" class="input" placeholder="name@example.com" /></div>
+              <div class="field"><label class="field-label" for="emlSubject">Subject</label><input id="emlSubject" class="input" /></div>
+              <div class="field"><label class="field-label" for="emlBody">Body</label><textarea id="emlBody" class="textarea"></textarea></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Appearance</div>
+            <div class="field">
+              <div class="field-label">Size <span class="hint-val" id="qrSizeVal">280 px</span></div>
+              <input type="range" id="qrSize" min="128" max="600" step="8" value="280" />
+            </div>
+            <div class="field">
+              <div class="field-label">Quiet zone (margin) <span class="hint-val" id="qrMarginVal">2 modules</span></div>
+              <input type="range" id="qrMargin" min="0" max="8" step="1" value="2" />
+            </div>
+            <div class="field-grid">
+              <div class="field">
+                <label class="field-label">Foreground</label>
+                <div class="color-row"><input type="color" id="qrFg" value="#181a1e" /><span class="color-label" id="qrFgLabel">#181A1E</span></div>
+              </div>
+              <div class="field">
+                <label class="field-label">Background</label>
+                <div class="color-row"><input type="color" id="qrBg" value="#ffffff" /><span class="color-label" id="qrBgLabel">#FFFFFF</span></div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="qrEcc">Error correction</label>
+              <select id="qrEcc" class="select">
+                <option value="L">Low — smallest, cleanest surfaces only</option>
+                <option value="M" selected>Medium — good default</option>
+                <option value="Q">Quartile — sturdier, slightly denser</option>
+                <option value="H">High — best for logos or printed labels</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">Center logo (optional)</label>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input type="file" id="qrLogoInput" accept="image/*" style="font-size:12.5px;" />
+                <button class="btn btn-ghost btn-sm" id="qrLogoClear" style="display:none;">Remove</button>
+              </div>
+              <div class="field-sub">Adding a logo automatically switches error correction to High so the code still scans.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Preview -->
+        <div>
+          <div class="preview-card">
+            <span class="reg-mark tl"></span><span class="reg-mark tr"></span><span class="reg-mark bl"></span><span class="reg-mark br"></span>
+            <div class="preview-stage">
+              <canvas id="qrPreviewCanvas" style="display:none;"></canvas>
+              <div class="empty-state" id="qrEmptyState">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                <div class="empty-title">Nothing to encode yet</div>
+                <div class="empty-sub">Fill in the fields on the left to see a live preview here.</div>
+              </div>
+            </div>
+            <div class="preview-meta" id="qrCharCount"></div>
+            <div id="qrActions" class="btn-row disabled">
+              <button class="btn btn-primary" id="qrDownloadPng">Download PNG</button>
+              <button class="btn btn-secondary" id="qrDownloadSvg">Download SVG</button>
+              <button class="btn btn-ghost" id="qrSaveHistory">Save to history</button>
+            </div>
+          </div>
+
+          <div class="history-wrap">
+            <div class="history-head"><h3>Recent QR codes</h3></div>
+            <div class="history-track" id="qrHistoryTrack"></div>
+            <div class="history-empty" id="qrHistoryEmpty">Nothing saved yet — codes you save will show up here.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- SECTION: SCAN ---------- -->
+    <section id="section-scan" class="panel">
+      <div class="topbar">
+        <h1>Scan a QR code</h1>
+        <p>Use your camera to scan, or upload an image if you'd rather not use the camera.</p>
+      </div>
+
+      <div class="scan-grid">
+        <div class="card">
+          <div class="viewfinder-wrap">
+            <video id="scanVideo" muted playsinline autoplay></video>
+            <div class="scan-idle" id="scanIdle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8V5a1 1 0 011-1h3M20 8V5a1 1 0 00-1-1h-3M4 16v3a1 1 0 001 1h3M20 16v3a1 1 0 01-1 1h-3M2 12h20"/></svg>
+              <div>Camera is off</div>
+            </div>
+            <div class="viewfinder" id="scanViewfinder">
+              <div class="vf-frame">
+                <span class="vf-corner tl"></span><span class="vf-corner tr"></span>
+                <span class="vf-corner bl"></span><span class="vf-corner br"></span>
+              </div>
+              <div class="vf-scanline"></div>
+            </div>
+          </div>
+          <canvas id="scanCanvas" style="display:none;"></canvas>
+
+          <div class="scan-controls">
+            <button class="btn btn-primary" id="scanStart">Start camera</button>
+            <button class="btn btn-secondary" id="scanStop" style="display:none;">Stop camera</button>
+            <select class="select" id="scanCameraSelect" style="display:none; width:auto;"></select>
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
+              Upload an image instead
+              <input type="file" id="scanUploadInput" accept="image/*" style="display:none;" />
+            </label>
+          </div>
+
+          <div class="scan-result-panel" id="scanResultPanel">
+            <div class="card-title" style="margin-bottom:8px;">Decoded result</div>
+            <div class="scan-result-text mono-input" id="scanResultText"></div>
+            <div class="scan-result-actions" id="scanResultActions"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Scan history</div>
+          <div id="scanHistoryList"></div>
+          <div class="history-empty" id="scanHistoryEmpty">Scanned codes from this session will appear here.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- SECTION: BARCODE ---------- -->
+    <section id="section-barcode" class="panel">
+      <div class="topbar">
+        <h1>Generate a barcode</h1>
+        <p>Choose a format, enter your data, and download a scannable barcode.</p>
+      </div>
+
+      <div class="workbench">
+        <div id="bcForm">
+          <div class="card">
+            <div class="card-title">Data</div>
+            <div class="field">
+              <label class="field-label" for="bcFormat">Format</label>
+              <select id="bcFormat" class="select">
+                <option value="CODE128" selected>CODE128 — general purpose</option>
+                <option value="EAN13">EAN-13 — retail products</option>
+                <option value="EAN8">EAN-8 — small retail products</option>
+                <option value="UPC">UPC-A — North American retail</option>
+                <option value="CODE39">CODE39 — logistics / industrial</option>
+                <option value="ITF14">ITF-14 — shipping cartons</option>
+                <option value="MSI">MSI — inventory / shelving</option>
+                <option value="pharmacode">Pharmacode — pharmaceutical packaging</option>
+                <option value="codabar">Codabar — libraries / blood banks</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label" for="bcData">Value to encode</label>
+              <input id="bcData" class="input mono-input" placeholder="e.g. 012345678905" />
+              <div class="field-sub" id="bcHintText">Accepts any ASCII text or numbers.</div>
+            </div>
+            <div class="error-box" id="bcError"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Appearance</div>
+            <div class="field-grid">
+              <div class="field">
+                <div class="field-label">Bar width <span class="hint-val" id="bcWidthVal">2 px</span></div>
+                <input type="range" id="bcWidth" min="1" max="4" step="0.5" value="2" />
+              </div>
+              <div class="field">
+                <div class="field-label">Height <span class="hint-val" id="bcHeightVal">100 px</span></div>
+                <input type="range" id="bcHeight" min="40" max="200" step="10" value="100" />
+              </div>
+            </div>
+            <div class="field-grid">
+              <div class="field">
+                <div class="field-label">Text size <span class="hint-val" id="bcFontSizeVal">16 px</span></div>
+                <input type="range" id="bcFontSize" min="10" max="24" step="1" value="16" />
+              </div>
+              <div class="field">
+                <div class="field-label">Margin <span class="hint-val" id="bcMarginVal">10 px</span></div>
+                <input type="range" id="bcMargin" min="0" max="30" step="2" value="10" />
+              </div>
+            </div>
+            <div class="field-grid">
+              <div class="field">
+                <label class="field-label">Bar color</label>
+                <div class="color-row"><input type="color" id="bcLineColor" value="#181a1e" /><span class="color-label">bars</span></div>
+              </div>
+              <div class="field">
+                <label class="field-label">Background</label>
+                <div class="color-row"><input type="color" id="bcBg" value="#ffffff" /><span class="color-label">bg</span></div>
+              </div>
+            </div>
+            <label class="checkbox-row"><input type="checkbox" id="bcShowText" checked /> Show human-readable text</label>
+          </div>
+        </div>
+
+        <div>
+          <div class="preview-card">
+            <span class="reg-mark tl"></span><span class="reg-mark tr"></span><span class="reg-mark bl"></span><span class="reg-mark br"></span>
+            <div class="preview-stage">
+              <svg id="bcPreviewSvg" style="display:none;"></svg>
+              <div class="empty-state" id="bcEmptyState">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 5v14M8 5v14M11 5v14M15 5v14M17 5v14M20 5v14"/></svg>
+                <div class="empty-title">No barcode yet</div>
+                <div class="empty-sub">Enter a value on the left to see a live preview here.</div>
+              </div>
+            </div>
+            <div id="bcActions" class="btn-row disabled">
+              <button class="btn btn-primary" id="bcDownloadPng">Download PNG</button>
+              <button class="btn btn-secondary" id="bcDownloadSvg">Download SVG</button>
+              <button class="btn btn-ghost" id="bcSaveHistory">Save to history</button>
+            </div>
+          </div>
+
+          <div class="history-wrap">
+            <div class="history-head"><h3>Recent barcodes</h3></div>
+            <div class="history-track" id="barcodeHistoryTrack"></div>
+            <div class="history-empty" id="barcodeHistoryEmpty">Nothing saved yet — codes you save will show up here.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- SECTION: BATCH ---------- -->
+    <section id="section-batch" class="panel">
+      <div class="topbar">
+        <h1>Batch generation</h1>
+        <p>Turn a list of values into many QR codes or barcodes at once, then download everything as a ZIP or a printable sheet.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">1. Choose type &amp; add data</div>
+        <div class="field-grid" style="margin-bottom:14px;">
+          <div class="field">
+            <label class="field-label">Code type</label>
+            <div class="seg batch-kind-seg">
+              <button class="seg-btn active" data-kind="qr">QR code</button>
+              <button class="seg-btn" data-kind="barcode">Barcode</button>
+            </div>
+          </div>
+          <div class="field" id="batchFormatField" style="display:none;">
+            <label class="field-label" for="batchFormatSelect">Barcode format</label>
+            <select id="batchFormatSelect" class="select">
+              <option value="CODE128" selected>CODE128</option>
+              <option value="EAN13">EAN-13</option>
+              <option value="EAN8">EAN-8</option>
+              <option value="UPC">UPC-A</option>
+              <option value="CODE39">CODE39</option>
+              <option value="ITF14">ITF-14</option>
+              <option value="MSI">MSI</option>
+              <option value="pharmacode">Pharmacode</option>
+              <option value="codabar">Codabar</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="batchInput">One value per line — add <span class="hint-val">| a label</span> after a pipe to control the filename</label>
+          <textarea id="batchInput" class="textarea mono-input" style="min-height:130px;" placeholder="012345678905 | Espresso Beans 250g&#10;012345678912 | Cold Brew 1L&#10;https://example.com/menu | Table Tent QR"></textarea>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap;">
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+            Upload CSV
+            <input type="file" id="batchCsvInput" accept=".csv" style="display:none;" />
+          </label>
+          <span class="field-sub" style="margin:0;">CSV should have a "value" column and an optional "label" column.</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">2. Validate</div>
+        <div class="batch-summary" id="batchSummary">
+          <span class="pill pill-ok">✓ <span id="batchValidCount">0</span> valid</span>
+          <span class="pill pill-bad">✕ <span id="batchInvalidCount">0</span> invalid</span>
+        </div>
+        <div class="invalid-list" id="batchInvalidList"></div>
+        <button class="btn btn-primary" id="batchGenerate" disabled>Generate batch</button>
+        <div class="progress-wrap" id="batchProgressWrap">
+          <div class="progress-track"><div class="progress-bar" id="batchProgressBar"></div></div>
+          <div class="progress-label" id="batchProgressLabel">0 / 0</div>
+        </div>
+      </div>
+
+      <div class="card batch-results" id="batchResultsWrap">
+        <div class="card-title">
+          <span><span id="batchResultCount">0</span> codes ready</span>
+        </div>
+        <div class="btn-row" style="margin-top:0;">
+          <button class="btn btn-primary" id="batchDownloadZip">Download ZIP</button>
+          <button class="btn btn-secondary" id="batchPrintSheet">Print sheet</button>
+          <button class="btn btn-danger" id="batchClearAll">Clear all</button>
+        </div>
+        <div class="batch-grid" id="batchGrid"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ============================= MOBILE TAB BAR ============================= -->
+<nav class="tabbar">
+  <div class="tabbar-inner">
+    <button class="tab-item active" data-section="generate">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+      QR
+    </button>
+    <button class="tab-item" data-section="scan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V5a1 1 0 011-1h3M20 8V5a1 1 0 00-1-1h-3M4 16v3a1 1 0 001 1h3M20 16v3a1 1 0 01-1 1h-3M2 12h20"/></svg>
+      Scan
+    </button>
+    <button class="tab-item" data-section="barcode">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5v14M8 5v14M11 5v14M15 5v14M17 5v14M20 5v14"/></svg>
+      Barcode
+    </button>
+    <button class="tab-item" data-section="batch">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+      Batch
+    </button>
+  </div>
+</nav>
+
+<div class="toast-stack" id="toastStack"></div>
+
+<!-- ============================= LIBRARIES ============================= -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.4.1/papaparse.min.js"></script>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================= HELPERS ============================= */
+const $ = (sel, ctx) => (ctx || document).querySelector(sel);
+const $$ = (sel, ctx) => Array.from((ctx || document).querySelectorAll(sel));
+const STORAGE_PREFIX = "scanline:";
+
+function debounce(fn, wait){
+  wait = wait || 200;
+  let t;
+  return function(){
+    const args = arguments;
+    clearTimeout(t);
+    t = setTimeout(function(){ fn.apply(null, args); }, wait);
+  };
+}
+function uid(){ return Math.random().toString(36).slice(2, 10); }
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];
+  });
+}
+function timeAgo(ts){
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s/60) + "m ago";
+  if (s < 86400) return Math.floor(s/3600) + "h ago";
+  return Math.floor(s/86400) + "d ago";
+}
+
+function toast(message, type, timeout){
+  type = type || "info";
+  timeout = timeout || 3200;
+  const stack = $("#toastStack");
+  const el = document.createElement("div");
+  el.className = "toast toast-" + type;
+  el.textContent = message;
+  stack.appendChild(el);
+  requestAnimationFrame(function(){ el.classList.add("show"); });
+  setTimeout(function(){
+    el.classList.remove("show");
+    setTimeout(function(){ el.remove(); }, 250);
+  }, timeout);
+}
+
+function loadJSON(key, fallback){
+  try{
+    const raw = localStorage.getItem(STORAGE_PREFIX + key);
+    return raw ? JSON.parse(raw) : fallback;
+  }catch(e){ return fallback; }
+}
+function saveJSON(key, value){
+  try{
+    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
+    return true;
+  }catch(e){
+    toast("Storage is full — clear some history to save more.", "error");
+    return false;
+  }
+}
+
+async function downloadDataURL(dataUrl, filename, mime){
+  mime = mime || "image/png";
+  if (window.showSaveFilePicker){
+    try{
+      const ext = filename.includes(".") ? filename.split(".").pop() : "png";
+      const accept = {};
+      accept[mime] = ["." + ext];
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: "File", accept: accept }]
+      });
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      toast("Saved " + filename, "success");
+      return;
+    }catch(err){
+      if (err && err.name === "AbortError") return;
+      // fall through to standard download below
+    }
+  }
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  toast("Downloaded " + filename, "success");
+}
+
+function downloadBlob(blob, filename, mime){
+  const url = URL.createObjectURL(blob);
+  downloadDataURL(url, filename, mime || blob.type).finally(function(){
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  });
+}
+
+function copyText(text){
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text)
+      .then(function(){ toast("Copied to clipboard", "success"); })
+      .catch(function(){ toast("Could not copy", "error"); });
+  } else {
+    toast("Clipboard isn't available in this browser", "error");
+  }
+}
+
+/* ============================= NAVIGATION ============================= */
+const SECTIONS = ["generate", "scan", "barcode", "batch"];
+function goTo(section){
+  SECTIONS.forEach(function(s){
+    $("#section-" + s).classList.toggle("active", s === section);
+  });
+  $$(".nav-item").forEach(function(b){ b.classList.toggle("active", b.dataset.section === section); });
+  $$(".tab-item").forEach(function(b){ b.classList.toggle("active", b.dataset.section === section); });
+  if (section !== "scan") stopCamera();
+  history.replaceState(null, "", "#" + section);
+}
+$$(".nav-item, .tab-item").forEach(function(btn){
+  btn.addEventListener("click", function(){ goTo(btn.dataset.section); });
+});
+
+/* ============================= SHARED HISTORY (QR + Barcode) ============================= */
+const HISTORY_LIMIT = 24;
+function getHistory(kind){ return loadJSON("history:" + kind, []); }
+function addHistoryItem(kind, item){
+  const list = getHistory(kind);
+  list.unshift(item);
+  while (list.length > HISTORY_LIMIT) list.pop();
+  if (saveJSON("history:" + kind, list)){
+    renderHistory(kind);
+    toast("Saved to history", "success");
+  }
+}
+function removeHistoryItem(kind, id){
+  const list = getHistory(kind).filter(function(i){ return i.id !== id; });
+  saveJSON("history:" + kind, list);
+  renderHistory(kind);
+}
+function renderHistory(kind){
+  const trackId = kind === "qr" ? "qrHistoryTrack" : "barcodeHistoryTrack";
+  const emptyId = kind === "qr" ? "qrHistoryEmpty" : "barcodeHistoryEmpty";
+  const track = $("#" + trackId);
+  const empty = $("#" + emptyId);
+  const list = getHistory(kind);
+  track.innerHTML = "";
+  empty.style.display = list.length ? "none" : "block";
+  list.forEach(function(item){
+    const el = document.createElement("div");
+    el.className = "history-item";
+    el.title = item.label || "";
+    const img = document.createElement("img");
+    img.src = item.thumb;
+    img.alt = item.label || kind;
+    img.addEventListener("click", function(){ downloadDataURL(item.thumb, kind + "-" + item.id + ".png", "image/png"); });
+    const rm = document.createElement("button");
+    rm.className = "history-remove";
+    rm.setAttribute("aria-label", "Remove from history");
+    rm.innerHTML = "&times;";
+    rm.addEventListener("click", function(e){ e.stopPropagation(); removeHistoryItem(kind, item.id); });
+    el.appendChild(img);
+    el.appendChild(rm);
+    track.appendChild(el);
+  });
+}
+
+/* ============================= QR GENERATE ============================= */
+const qrState = { logoDataUrl: null, lastText: "", lastDataUrl: null };
+
+function getActiveQRType(){
+  const btn = $(".qr-type-seg .seg-btn.active");
+  return btn ? btn.dataset.type : "text";
+}
+function escapeVCard(v){
+  return (v || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+}
+function escapeWifi(v){
+  return (v || "").replace(/([\\;,":])/g, "\\$1");
+}
+function buildQRPayload(){
+  const type = getActiveQRType();
+  if (type === "text"){
+    return $("#qrText").value.trim();
+  }
+  if (type === "url"){
+    let v = $("#qrUrl").value.trim();
+    if (v && !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(v)) v = "https://" + v;
+    return v;
+  }
+  if (type === "wifi"){
+    const ssid = $("#wifiSsid").value.trim();
+    if (!ssid) return "";
+    const enc = $("#wifiEnc").value;
+    const pass = $("#wifiPass").value;
+    const hidden = $("#wifiHidden").checked ? "true" : "false";
+    const passPart = enc === "nopass" ? "" : ("P:" + escapeWifi(pass) + ";");
+    return "WIFI:T:" + enc + ";S:" + escapeWifi(ssid) + ";" + passPart + "H:" + hidden + ";;";
+  }
+  if (type === "vcard"){
+    const first = $("#vFirst").value.trim();
+    const last = $("#vLast").value.trim();
+    if (!first && !last) return "";
+    const lines = [
+      "BEGIN:VCARD", "VERSION:3.0",
+      "N:" + escapeVCard(last) + ";" + escapeVCard(first) + ";;;",
+      "FN:" + escapeVCard((first + " " + last).trim())
+    ];
+    if ($("#vOrg").value.trim()) lines.push("ORG:" + escapeVCard($("#vOrg").value.trim()));
+    if ($("#vPhone").value.trim()) lines.push("TEL;TYPE=CELL:" + escapeVCard($("#vPhone").value.trim()));
+    if ($("#vEmail").value.trim()) lines.push("EMAIL:" + escapeVCard($("#vEmail").value.trim()));
+    if ($("#vWebsite").value.trim()) lines.push("URL:" + escapeVCard($("#vWebsite").value.trim()));
+    lines.push("END:VCARD");
+    return lines.join("\n");
+  }
+  if (type === "email"){
+    const to = $("#emlTo").value.trim();
+    if (!to) return "";
+    const params = new URLSearchParams();
+    if ($("#emlSubject").value.trim()) params.set("subject", $("#emlSubject").value.trim());
+    if ($("#emlBody").value.trim()) params.set("body", $("#emlBody").value.trim());
+    const qs = params.toString();
+    return "mailto:" + to + (qs ? "?" + qs : "");
+  }
+  return "";
+}
+
+function drawLogoOnCanvas(canvas, dataUrl){
+  return new Promise(function(resolve){
+    const img = new Image();
+    img.onload = function(){
+      const ctx = canvas.getContext("2d");
+      const logoSize = canvas.width * 0.22;
+      const x = (canvas.width - logoSize) / 2;
+      const y = (canvas.height - logoSize) / 2;
+      const pad = logoSize * 0.12;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(x - pad, y - pad, logoSize + pad * 2, logoSize + pad * 2);
+      ctx.drawImage(img, x, y, logoSize, logoSize);
+      resolve();
+    };
+    img.onerror = resolve;
+    img.src = dataUrl;
+  });
+}
+
+function setQREmpty(title, sub){
+  $("#qrPreviewCanvas").style.display = "none";
+  const empty = $("#qrEmptyState");
+  empty.style.display = "flex";
+  empty.querySelector(".empty-title").textContent = title;
+  empty.querySelector(".empty-sub").textContent = sub;
+  $("#qrActions").classList.add("disabled");
+  $("#qrCharCount").textContent = "";
+}
+
+async function renderQR(){
+  const text = buildQRPayload();
+  if (!text){
+    setQREmpty("Nothing to encode yet", "Fill in the fields on the left to see a live preview here.");
+    qrState.lastText = "";
+    return;
+  }
+  const size = parseInt($("#qrSize").value, 10);
+  const margin = parseInt($("#qrMargin").value, 10);
+  const dark = $("#qrFg").value;
+  const light = $("#qrBg").value;
+  const ecc = $("#qrEcc").value;
+  const canvas = $("#qrPreviewCanvas");
+
+  try{
+    await QRCode.toCanvas(canvas, text, {
+      width: size,
+      margin: margin,
+      errorCorrectionLevel: qrState.logoDataUrl ? "H" : ecc,
+      color: { dark: dark, light: light }
+    });
+    if (qrState.logoDataUrl){
+      await drawLogoOnCanvas(canvas, qrState.logoDataUrl);
+    }
+    canvas.style.display = "block";
+    $("#qrEmptyState").style.display = "none";
+    $("#qrActions").classList.remove("disabled");
+    $("#qrDownloadSvg").disabled = !!qrState.logoDataUrl;
+    $("#qrDownloadSvg").title = qrState.logoDataUrl ? "SVG export isn't available with a logo overlay — use PNG instead." : "";
+    qrState.lastText = text;
+    qrState.lastDataUrl = canvas.toDataURL("image/png");
+    $("#qrCharCount").textContent = text.length + " characters encoded";
+  }catch(err){
+    setQREmpty("Too much data for this QR code", "Shorten the content or lower the error correction level.");
+    qrState.lastText = "";
+  }
+}
+const debouncedRenderQR = debounce(renderQR, 180);
+
+$("#qrForm").addEventListener("input", debouncedRenderQR);
+$("#qrForm").addEventListener("change", debouncedRenderQR);
+$("#qrSize").addEventListener("input", function(){ $("#qrSizeVal").textContent = this.value + " px"; });
+$("#qrMargin").addEventListener("input", function(){ $("#qrMarginVal").textContent = this.value + " modules"; });
+$("#qrFg").addEventListener("input", function(){ $("#qrFgLabel").textContent = this.value.toUpperCase(); });
+$("#qrBg").addEventListener("input", function(){ $("#qrBgLabel").textContent = this.value.toUpperCase(); });
+
+$$(".qr-type-seg .seg-btn").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    $$(".qr-type-seg .seg-btn").forEach(function(b){ b.classList.remove("active"); });
+    btn.classList.add("active");
+    $$(".qr-field-group").forEach(function(g){
+      g.style.display = g.dataset.group === btn.dataset.type ? "grid" : "none";
+    });
+    renderQR();
+  });
+});
+
+$("#qrLogoInput").addEventListener("change", function(e){
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(){
+    qrState.logoDataUrl = reader.result;
+    $("#qrLogoClear").style.display = "inline-flex";
+    renderQR();
+  };
+  reader.readAsDataURL(file);
+});
+$("#qrLogoClear").addEventListener("click", function(){
+  qrState.logoDataUrl = null;
+  $("#qrLogoInput").value = "";
+  $("#qrLogoClear").style.display = "none";
+  renderQR();
+});
+
+$("#qrDownloadPng").addEventListener("click", function(){
+  if (!qrState.lastDataUrl) return;
+  downloadDataURL(qrState.lastDataUrl, "qr-" + uid() + ".png", "image/png");
+});
+$("#qrDownloadSvg").addEventListener("click", function(){
+  if (!qrState.lastText || qrState.logoDataUrl) return;
+  const ecc = $("#qrEcc").value;
+  QRCode.toString(qrState.lastText, {
+    type: "svg",
+    margin: parseInt($("#qrMargin").value, 10),
+    color: { dark: $("#qrFg").value, light: $("#qrBg").value },
+    errorCorrectionLevel: ecc
+  }, function(err, svg){
+    if (err){ toast("Could not create an SVG for this content.", "error"); return; }
+    const blob = new Blob([svg], { type: "image/svg+xml" });
+    downloadBlob(blob, "qr-" + uid() + ".svg", "image/svg+xml");
+  });
+});
+$("#qrSaveHistory").addEventListener("click", function(){
+  if (!qrState.lastDataUrl) return;
+  addHistoryItem("qr", {
+    id: uid(), created: Date.now(), thumb: qrState.lastDataUrl, label: qrState.lastText.slice(0, 40)
+  });
+});
+
+/* ============================= BARCODE GENERATE ============================= */
+const FORMAT_HINTS = {
+  CODE128: "Accepts any ASCII text or numbers.",
+  EAN13: "Needs exactly 12 or 13 digits.",
+  EAN8: "Needs exactly 7 or 8 digits.",
+  UPC: "Needs exactly 11 or 12 digits.",
+  CODE39: "Uppercase letters, digits, spaces, and - . $ / + %.",
+  ITF14: "Needs exactly 13 or 14 digits.",
+  MSI: "Digits only.",
+  pharmacode: "A number between 3 and 131070.",
+  codabar: "Digits with A, B, C or D as start/stop characters."
+};
+function formatHint(f){ return FORMAT_HINTS[f] || "Check the value for this format."; }
+function formatLabel(f){
+  const opt = $('#bcFormat option[value="' + f + '"]');
+  return opt ? opt.textContent : f;
+}
+
+let bcValid = false;
+function renderBarcode(){
+  const format = $("#bcFormat").value;
+  const data = $("#bcData").value;
+  const svg = $("#bcPreviewSvg");
+  const emptyState = $("#bcEmptyState");
+  const actions = $("#bcActions");
+  const errorBox = $("#bcError");
+  errorBox.style.display = "none";
+  bcValid = false;
+
+  if (!data){
+    svg.style.display = "none";
+    emptyState.style.display = "flex";
+    actions.classList.add("disabled");
+    return;
+  }
+  try{
+    JsBarcode(svg, data, {
+      format: format,
+      width: parseFloat($("#bcWidth").value),
+      height: parseFloat($("#bcHeight").value),
+      displayValue: $("#bcShowText").checked,
+      fontSize: parseFloat($("#bcFontSize").value),
+      margin: parseFloat($("#bcMargin").value),
+      lineColor: $("#bcLineColor").value,
+      background: $("#bcBg").value,
+      valid: function(ok){ bcValid = ok; }
+    });
+    if (!bcValid){
+      throw new Error('"' + data + '" isn\'t valid for ' + formatLabel(format) + ". " + formatHint(format));
+    }
+    svg.style.display = "block";
+    emptyState.style.display = "none";
+    actions.classList.remove("disabled");
+  }catch(err){
+    svg.style.display = "none";
+    emptyState.style.display = "flex";
+    actions.classList.add("disabled");
+    errorBox.textContent = (err && err.message) ? err.message : ("That value isn't valid for " + formatLabel(format) + ".");
+    errorBox.style.display = "block";
+    bcValid = false;
+  }
+}
+const debouncedRenderBarcode = debounce(renderBarcode, 180);
+
+$("#bcForm").addEventListener("input", debouncedRenderBarcode);
+$("#bcForm").addEventListener("change", debouncedRenderBarcode);
+$("#bcFormat").addEventListener("change", function(){ $("#bcHintText").textContent = formatHint(this.value); });
+$("#bcWidth").addEventListener("input", function(){ $("#bcWidthVal").textContent = this.value + " px"; });
+$("#bcHeight").addEventListener("input", function(){ $("#bcHeightVal").textContent = this.value + " px"; });
+$("#bcFontSize").addEventListener("input", function(){ $("#bcFontSizeVal").textContent = this.value + " px"; });
+$("#bcMargin").addEventListener("input", function(){ $("#bcMarginVal").textContent = this.value + " px"; });
+
+function svgToPngDataUrl(svgEl, scale){
+  scale = scale || 2;
+  return new Promise(function(resolve, reject){
+    const xml = new XMLSerializer().serializeToString(svgEl);
+    const svg64 = btoa(unescape(encodeURIComponent(xml)));
+    const img = new Image();
+    img.onload = function(){
+      const bbox = svgEl.getBBox ? null : null;
+      const w = (svgEl.viewBox && svgEl.viewBox.baseVal && svgEl.viewBox.baseVal.width) || svgEl.width.baseVal.value || 300;
+      const h = (svgEl.viewBox && svgEl.viewBox.baseVal && svgEl.viewBox.baseVal.height) || svgEl.height.baseVal.value || 150;
+      const canvas = document.createElement("canvas");
+      canvas.width = w * scale;
+      canvas.height = h * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = "data:image/svg+xml;base64," + svg64;
+  });
+}
+
+$("#bcDownloadPng").addEventListener("click", async function(){
+  if (!bcValid) return;
+  try{
+    const dataUrl = await svgToPngDataUrl($("#bcPreviewSvg"), 3);
+    downloadDataURL(dataUrl, "barcode-" + uid() + ".png", "image/png");
+  }catch(e){ toast("Could not export a PNG for this barcode.", "error"); }
+});
+$("#bcDownloadSvg").addEventListener("click", function(){
+  if (!bcValid) return;
+  const xml = new XMLSerializer().serializeToString($("#bcPreviewSvg"));
+  const blob = new Blob([xml], { type: "image/svg+xml" });
+  downloadBlob(blob, "barcode-" + uid() + ".svg", "image/svg+xml");
+});
+$("#bcSaveHistory").addEventListener("click", async function(){
+  if (!bcValid) return;
+  try{
+    const dataUrl = await svgToPngDataUrl($("#bcPreviewSvg"), 1.5);
+    addHistoryItem("barcode", { id: uid(), created: Date.now(), thumb: dataUrl, label: $("#bcData").value.slice(0, 40) });
+  }catch(e){ toast("Could not save this barcode.", "error"); }
+});
+
+/* ============================= SCANNER ============================= */
+const camState = { stream: null, rafId: null, facingMode: "environment", lastText: "", lastAt: 0 };
+
+function scanErrorMessage(err){
+  if (err && err.name === "NotAllowedError") return "Camera access was denied. Allow camera access in your browser settings and try again.";
+  if (err && err.name === "NotFoundError") return "No camera was found on this device.";
+  return "Could not start the camera. Try uploading an image instead.";
+}
+
+async function populateCameraList(){
+  try{
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(function(d){ return d.kind === "videoinput"; });
+    const sel = $("#scanCameraSelect");
+    if (cams.length > 1){
+      sel.style.display = "inline-flex";
+      sel.innerHTML = cams.map(function(c, i){
+        return '<option value="' + c.deviceId + '">' + (c.label || ("Camera " + (i + 1))) + "</option>";
+      }).join("");
+    } else {
+      sel.style.display = "none";
+    }
+  }catch(e){ /* enumeration may fail silently in some browsers */ }
+}
+
+function showCameraUI(){
+  $("#scanStart").style.display = "none";
+  $("#scanStop").style.display = "inline-flex";
+  $("#scanIdle").style.display = "none";
+  $("#scanViewfinder").style.display = "block";
+}
+
+async function attachStream(constraints){
+  const stream = await navigator.mediaDevices.getUserMedia(constraints);
+  camState.stream = stream;
+  const video = $("#scanVideo");
+  video.srcObject = stream;
+  await video.play();
+  showCameraUI();
+  scanLoop();
+}
+
+async function startCamera(){
+  if (camState.stream) return;
+  try{
+    await attachStream({ video: { facingMode: camState.facingMode }, audio: false });
+    await populateCameraList();
+  }catch(err){
+    toast(scanErrorMessage(err), "error");
+  }
+}
+function stopCamera(){
+  if (camState.rafId) cancelAnimationFrame(camState.rafId);
+  camState.rafId = null;
+  if (camState.stream){
+    camState.stream.getTracks().forEach(function(t){ t.stop(); });
+    camState.stream = null;
+  }
+  $("#scanStart").style.display = "inline-flex";
+  $("#scanStop").style.display = "none";
+  $("#scanIdle").style.display = "flex";
+  $("#scanViewfinder").style.display = "none";
+}
+function scanLoop(){
+  const video = $("#scanVideo");
+  const canvas = $("#scanCanvas");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  function tick(){
+    if (!camState.stream) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA){
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
+      if (code && code.data){ handleDecoded(code.data); }
+    }
+    camState.rafId = requestAnimationFrame(tick);
+  }
+  camState.rafId = requestAnimationFrame(tick);
+}
+
+function flashViewfinder(){
+  const vf = $("#scanViewfinder");
+  vf.classList.add("success");
+  setTimeout(function(){ vf.classList.remove("success"); }, 500);
+}
+
+function showScanResult(text){
+  $("#scanResultPanel").style.display = "block";
+  $("#scanResultText").textContent = text;
+  const actions = $("#scanResultActions");
+  actions.innerHTML = "";
+  function addBtn(label, onClick){
+    const b = document.createElement("button");
+    b.className = "btn btn-secondary btn-sm";
+    b.textContent = label;
+    b.addEventListener("click", onClick);
+    actions.appendChild(b);
+  }
+  addBtn("Copy", function(){ copyText(text); });
+  if (/^https?:\/\//i.test(text)){
+    addBtn("Open link", function(){ window.open(text, "_blank", "noopener"); });
+  }
+  if (/^WIFI:/i.test(text)){
+    const m = /P:([^;]*);/.exec(text);
+    if (m) addBtn("Copy password", function(){ copyText(m[1]); });
+  }
+}
+
+function handleDecoded(text){
+  const now = Date.now();
+  if (text === camState.lastText && now - camState.lastAt < 2500) return;
+  camState.lastText = text;
+  camState.lastAt = now;
+  flashViewfinder();
+  if (navigator.vibrate) navigator.vibrate(60);
+  showScanResult(text);
+  addScanHistory(text);
+}
+
+function addScanHistory(text){
+  const list = loadJSON("history:scans", []);
+  list.unshift({ id: uid(), text: text, created: Date.now() });
+  while (list.length > 50) list.pop();
+  saveJSON("history:scans", list);
+  renderScanHistory();
+}
+function renderScanHistory(){
+  const list = loadJSON("history:scans", []);
+  const wrap = $("#scanHistoryList");
+  const empty = $("#scanHistoryEmpty");
+  wrap.innerHTML = "";
+  empty.style.display = list.length ? "none" : "block";
+  list.forEach(function(item){
+    const row = document.createElement("div");
+    row.className = "scan-history-row";
+    row.innerHTML = '<span class="mono-input truncate">' + escapeHtml(item.text) + '</span><span class="scan-time">' + timeAgo(item.created) + "</span>";
+    row.addEventListener("click", function(){ showScanResult(item.text); });
+    wrap.appendChild(row);
+  });
+}
+
+$("#scanStart").addEventListener("click", startCamera);
+$("#scanStop").addEventListener("click", stopCamera);
+$("#scanCameraSelect").addEventListener("change", async function(e){
+  stopCamera();
+  try{
+    await attachStream({ video: { deviceId: { exact: e.target.value } } });
+  }catch(err){ toast(scanErrorMessage(err), "error"); }
+});
+$("#scanUploadInput").addEventListener("change", function(e){
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(){
+    const img = new Image();
+    img.onload = function(){
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      if (code && code.data){
+        handleDecoded(code.data);
+        toast("QR code decoded from image", "success");
+      } else {
+        toast("No QR code found in that image.", "error");
+      }
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = "";
+});
+document.addEventListener("visibilitychange", function(){
+  if (document.hidden) stopCamera();
+});
+
+/* ============================= BATCH ============================= */
+let batchQueue = [];
+let batchResults = [];
+
+function parseBatchInput(){
+  const raw = $("#batchInput").value;
+  const lines = raw.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean);
+  return lines.map(function(line){
+    const parts = line.split("|").map(function(s){ return s.trim(); });
+    return { value: parts[0], label: parts[1] || parts[0] };
+  });
+}
+
+function validateBatch(){
+  const kindBtn = $(".batch-kind-seg .seg-btn.active");
+  const kind = kindBtn ? kindBtn.dataset.kind : "qr";
+  const rows = parseBatchInput();
+  if (!rows.length){
+    $("#batchSummary").style.display = "none";
+    $("#batchGenerate").disabled = true;
+    $("#batchInvalidList").innerHTML = "";
+    batchQueue = [];
+    return;
+  }
+  const format = $("#batchFormatSelect").value;
+  batchQueue = rows.map(function(r, i){
+    let valid = true, reason = "";
+    if (kind === "barcode"){
+      try{
+        const probe = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        JsBarcode(probe, r.value, { format: format, valid: function(ok){ valid = ok; } });
+        if (!valid) reason = formatHint(format);
+      }catch(err){
+        valid = false;
+        reason = (err && err.message) ? err.message : formatHint(format);
+      }
+    } else {
+      if (r.value.length > 2900){ valid = false; reason = "Too long to encode as a QR code."; }
+    }
+    return { value: r.value, label: r.label, row: i + 1, valid: valid, reason: reason };
+  });
+  const validCount = batchQueue.filter(function(r){ return r.valid; }).length;
+  const invalidCount = batchQueue.length - validCount;
+  $("#batchSummary").style.display = "flex";
+  $("#batchValidCount").textContent = validCount;
+  $("#batchInvalidCount").textContent = invalidCount;
+  $("#batchGenerate").disabled = validCount === 0;
+  const invalidList = $("#batchInvalidList");
+  invalidList.innerHTML = "";
+  batchQueue.filter(function(r){ return !r.valid; }).forEach(function(r){
+    const row = document.createElement("div");
+    row.className = "invalid-row";
+    row.innerHTML = '<span class="mono-input">Row ' + r.row + ': "' + escapeHtml(r.value) + '"</span><span class="invalid-reason">' + escapeHtml(r.reason) + "</span>";
+    invalidList.appendChild(row);
+  });
+}
+const debouncedValidateBatch = debounce(validateBatch, 300);
+$("#batchInput").addEventListener("input", debouncedValidateBatch);
+$("#batchFormatSelect").addEventListener("change", validateBatch);
+$$(".batch-kind-seg .seg-btn").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    $$(".batch-kind-seg .seg-btn").forEach(function(b){ b.classList.remove("active"); });
+    btn.classList.add("active");
+    $("#batchFormatField").style.display = btn.dataset.kind === "barcode" ? "block" : "none";
+    validateBatch();
+  });
+});
+
+$("#batchCsvInput").addEventListener("change", function(e){
+  const file = e.target.files[0];
+  if (!file) return;
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: function(res){
+      const fields = res.meta.fields || [];
+      const lowerFields = fields.map(function(f){ return f.toLowerCase(); });
+      const valueKey = fields[lowerFields.indexOf("value")] || fields[lowerFields.indexOf("data")] || fields[0];
+      const labelIdx = lowerFields.indexOf("label") >= 0 ? lowerFields.indexOf("label") : lowerFields.indexOf("name");
+      const labelKey = labelIdx >= 0 ? fields[labelIdx] : fields[1];
+      const rows = res.data.map(function(r){
+        const value = (r[valueKey] || "").toString().trim();
+        const label = labelKey ? (r[labelKey] || "").toString().trim() : value;
+        return { value: value, label: label || value };
+      }).filter(function(r){ return r.value; });
+      $("#batchInput").value = rows.map(function(r){
+        return (r.label && r.label !== r.value) ? (r.value + " | " + r.label) : r.value;
+      }).join("\n");
+      toast("Loaded " + rows.length + " rows from " + file.name, "success");
+      validateBatch();
+    },
+    error: function(){ toast("Could not read that CSV file.", "error"); }
+  });
+  e.target.value = "";
+});
+
+async function generateOne(kind, format, row){
+  try{
+    let dataUrl;
+    if (kind === "qr"){
+      const canvas = document.createElement("canvas");
+      await QRCode.toCanvas(canvas, row.value, { width: 300, margin: 2 });
+      dataUrl = canvas.toDataURL("image/png");
+    } else {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      JsBarcode(svg, row.value, { format: format, displayValue: true });
+      dataUrl = await svgToPngDataUrl(svg, 2);
+    }
+    batchResults.push({ id: uid(), label: row.label, value: row.value, dataUrl: dataUrl, error: false });
+  }catch(err){
+    batchResults.push({ id: uid(), label: row.label, value: row.value, error: true });
+  }
+}
+
+function renderBatchGrid(){
+  const grid = $("#batchGrid");
+  grid.innerHTML = "";
+  batchResults.forEach(function(item){
+    const cell = document.createElement("div");
+    cell.className = "batch-cell";
+    if (item.error){
+      cell.innerHTML = '<div class="batch-cell-error">Failed</div><div class="batch-cell-label">' + escapeHtml(item.label) + "</div>";
+    } else {
+      cell.innerHTML = '<img src="' + item.dataUrl + '" alt="">' +
+        '<div class="batch-cell-label">' + escapeHtml(item.label) + '</div>' +
+        '<button class="batch-cell-remove" aria-label="Remove">&times;</button>';
+      cell.querySelector(".batch-cell-remove").addEventListener("click", function(){
+        batchResults = batchResults.filter(function(r){ return r.id !== item.id; });
+        renderBatchGrid();
+        $("#batchResultCount").textContent = batchResults.length;
+      });
+    }
+    grid.appendChild(cell);
+  });
+}
+
+async function generateBatch(){
+  const kindBtn = $(".batch-kind-seg .seg-btn.active");
+  const kind = kindBtn ? kindBtn.dataset.kind : "qr";
+  const format = $("#batchFormatSelect").value;
+  const validRows = batchQueue.filter(function(r){ return r.valid; });
+  if (!validRows.length) return;
+  batchResults = [];
+  $("#batchGrid").innerHTML = "";
+  $("#batchProgressWrap").style.display = "block";
+  $("#batchGenerate").disabled = true;
+  const CHUNK = 8;
+  for (let i = 0; i < validRows.length; i += CHUNK){
+    const chunk = validRows.slice(i, i + CHUNK);
+    await Promise.all(chunk.map(function(row){ return generateOne(kind, format, row); }));
+    const done = Math.min(i + chunk.length, validRows.length);
+    const pct = Math.round((done / validRows.length) * 100);
+    $("#batchProgressBar").style.width = pct + "%";
+    $("#batchProgressLabel").textContent = done + " / " + validRows.length;
+    await new Promise(function(r){ setTimeout(r, 0); });
+  }
+  $("#batchProgressWrap").style.display = "none";
+  $("#batchGenerate").disabled = false;
+  $("#batchResultsWrap").style.display = "block";
+  $("#batchResultCount").textContent = batchResults.length;
+  renderBatchGrid();
+  toast("Generated " + batchResults.length + " codes", "success");
+}
+$("#batchGenerate").addEventListener("click", generateBatch);
+
+$("#batchDownloadZip").addEventListener("click", async function(){
+  const ok = batchResults.filter(function(r){ return !r.error; });
+  if (!ok.length) return;
+  const zip = new JSZip();
+  const usedNames = [];
+  const filenames = [];
+  ok.forEach(function(item){
+    let base = (item.label || item.value).replace(/[^a-z0-9-_]+/gi, "_").slice(0, 40) || "code";
+    let finalName = base + ".png";
+    let n = 1;
+    while (usedNames.indexOf(finalName) !== -1){ finalName = base + "_" + (n++) + ".png"; }
+    usedNames.push(finalName);
+    filenames.push(finalName);
+    const base64 = item.dataUrl.split(",")[1];
+    zip.file(finalName, base64, { base64: true });
+  });
+  const manifestRows = ["value,label,filename"];
+  ok.forEach(function(item, i){
+    manifestRows.push('"' + item.value.replace(/"/g, '""') + '","' + (item.label || "").replace(/"/g, '""') + '","' + filenames[i] + '"');
+  });
+  zip.file("manifest.csv", manifestRows.join("\n"));
+  const blob = await zip.generateAsync({ type: "blob" });
+  downloadBlob(blob, "codes-batch-" + uid() + ".zip", "application/zip");
+});
+
+$("#batchPrintSheet").addEventListener("click", function(){
+  const ok = batchResults.filter(function(r){ return !r.error; });
+  if (!ok.length) return;
+  const win = window.open("", "_blank");
+  if (!win){ toast("Your browser blocked the print window. Allow pop-ups and try again.", "error"); return; }
+  const cells = ok.map(function(i){
+    return '<div class="cell"><img src="' + i.dataUrl + '"><div>' + escapeHtml(i.label) + "</div></div>";
+  }).join("");
+  win.document.write(
+    "<html><head><title>Print codes</title><style>" +
+    "body{font-family:sans-serif;margin:24px;}" +
+    ".sheet{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:16px;}" +
+    ".cell{text-align:center;border:1px dashed #ccc;padding:8px;break-inside:avoid;}" +
+    ".cell img{width:100%;height:auto;}" +
+    ".cell div{font-size:11px;margin-top:4px;word-break:break-word;}" +
+    "@media print{.cell{border-color:#ddd;}}" +
+    "</style></head><body><div class=\"sheet\">" + cells + "</div>" +
+    "<script>window.onload=function(){window.print();};<\/script>" +
+    "</body></html>"
+  );
+  win.document.close();
+});
+
+$("#batchClearAll").addEventListener("click", function(){
+  $("#batchInput").value = "";
+  batchQueue = [];
+  batchResults = [];
+  $("#batchGrid").innerHTML = "";
+  $("#batchSummary").style.display = "none";
+  $("#batchResultsWrap").style.display = "none";
+  $("#batchGenerate").disabled = true;
+});
+
+/* ============================= INIT ============================= */
+function init(){
+  const initial = SECTIONS.indexOf(location.hash.slice(1)) >= 0 ? location.hash.slice(1) : "generate";
+  goTo(initial);
+  renderHistory("qr");
+  renderHistory("barcode");
+  renderScanHistory();
+  renderQR();
+}
+init();
+
+})();
+</script>
+</body>
+</html>
