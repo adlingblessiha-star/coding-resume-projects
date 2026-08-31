@@ -1,0 +1,246 @@
+
+"""
+============================================================
+ SIMPLE EXPENSE TRACKER
+============================================================
+What this does:
+- Lets you log daily expenses (date, category, amount, note)
+- Saves everything to a CSV file (expenses.csv) — you can open
+  this same file in Excel / Google Sheets if you ever want to.
+- Shows totals by category and overall
+- Shows a weekly or monthly summary
+- Warns you if a category goes over a budget you set
+
+How to run:
+    python expense_tracker.py
+
+No extra libraries needed — everything here is built into Python.
+============================================================
+"""
+
+import csv
+import os
+from datetime import datetime, timedelta
+from collections import defaultdict
+
+# ------------------------------------------------------------
+# 1. SETTINGS  — edit these to fit your own life
+# ------------------------------------------------------------
+
+FILE_NAME = "expenses.csv"
+
+# The categories you're allowed to log expenses under.
+CATEGORIES = [
+    "Food",
+    "Transportation",
+    "Bills",
+    "Entertainment",
+    "Shopping",
+    "Health",
+    "Other",
+]
+
+# Optional: set a monthly budget per category (in your currency).
+# Leave a category out (or set it to None) if you don't want a limit.
+MONTHLY_BUDGETS = {
+    "Food": 5000,
+    "Transportation": 1500,
+    "Bills": 4000,
+    "Entertainment": 1000,
+    "Shopping": 2000,
+    "Health": 1000,
+    "Other": 1000,
+}
+
+CSV_HEADERS = ["Date", "Category", "Amount", "Note"]
+
+
+# ------------------------------------------------------------
+# 2. FILE HANDLING
+# ------------------------------------------------------------
+
+def initialize_file():
+    """Create the CSV file with headers if it doesn't exist yet."""
+    if not os.path.exists(FILE_NAME):
+        with open(FILE_NAME, mode="w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(CSV_HEADERS)
+
+
+def load_expenses():
+    """Read all expenses from the CSV file into a list of dicts."""
+    expenses = []
+    with open(FILE_NAME, mode="r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            row["Amount"] = float(row["Amount"])
+            row["Date"] = datetime.strptime(row["Date"], "%Y-%m-%d")
+            expenses.append(row)
+    return expenses
+
+
+def save_expense(date_str, category, amount, note):
+    """Append a single expense row to the CSV file."""
+    with open(FILE_NAME, mode="a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow([date_str, category, amount, note])
+
+
+# ------------------------------------------------------------
+# 3. CORE FEATURES
+# ------------------------------------------------------------
+
+def add_expense():
+    """Ask the user for expense details and save it."""
+    print("\n--- Add a New Expense ---")
+
+    # --- Date ---
+    date_input = input("Date (YYYY-MM-DD) [press Enter for today]: ").strip()
+    if date_input == "":
+        date_str = datetime.now().strftime("%Y-%m-%d")
+    else:
+        try:
+            datetime.strptime(date_input, "%Y-%m-%d")  # validate format
+            date_str = date_input
+        except ValueError:
+            print("⚠️  Invalid date format. Using today's date instead.")
+            date_str = datetime.now().strftime("%Y-%m-%d")
+
+    # --- Category ---
+    print("Categories:", ", ".join(CATEGORIES))
+    category = input("Category: ").strip().title()
+    if category not in CATEGORIES:
+        print("⚠️  Not in your category list — saving it under 'Other' instead.")
+        category = "Other"
+
+    # --- Amount ---
+    while True:
+        amount_input = input("Amount: ").strip()
+        try:
+            amount = float(amount_input)
+            if amount <= 0:
+                print("⚠️  Amount must be greater than 0. Try again.")
+                continue
+            break
+        except ValueError:
+            print("⚠️  Please enter a valid number (e.g. 250.50).")
+
+    # --- Note (optional) ---
+    note = input("Note (optional, e.g. 'lunch with friends'): ").strip()
+
+    save_expense(date_str, category, amount, note)
+    print(f"✅ Saved: {date_str} | {category} | {amount:.2f} | {note}")
+
+
+def view_all_expenses():
+    """Print every logged expense, most recent first."""
+    expenses = load_expenses()
+    if not expenses:
+        print("\nNo expenses logged yet.")
+        return
+
+    expenses.sort(key=lambda e: e["Date"], reverse=True)
+    print("\n--- All Expenses ---")
+    print(f"{'Date':<12}{'Category':<16}{'Amount':>10}   Note")
+    print("-" * 55)
+    for e in expenses:
+        date_str = e["Date"].strftime("%Y-%m-%d")
+        print(f"{date_str:<12}{e['Category']:<16}{e['Amount']:>10.2f}   {e['Note']}")
+
+
+def filter_by_period(expenses, period):
+    """Return only the expenses within the last 7 or 30 days."""
+    today = datetime.now()
+    if period == "weekly":
+        cutoff = today - timedelta(days=7)
+    else:  # monthly
+        cutoff = today - timedelta(days=30)
+    return [e for e in expenses if e["Date"] >= cutoff]
+
+
+def summarize(period):
+    """Show totals by category + overall for the chosen period,
+    and flag any category that's over its monthly budget."""
+    expenses = load_expenses()
+    if not expenses:
+        print("\nNo expenses logged yet.")
+        return
+
+    filtered = filter_by_period(expenses, period)
+    label = "Last 7 Days (Weekly)" if period == "weekly" else "Last 30 Days (Monthly)"
+
+    print(f"\n--- Summary: {label} ---")
+    if not filtered:
+        print("No expenses in this period.")
+        return
+
+    totals_by_category = defaultdict(float)
+    for e in filtered:
+        totals_by_category[e["Category"]] += e["Amount"]
+
+    grand_total = sum(totals_by_category.values())
+
+    print(f"{'Category':<16}{'Spent':>10}   {'Budget':>10}   Status")
+    print("-" * 55)
+    for category in CATEGORIES:
+        spent = totals_by_category.get(category, 0)
+        if spent == 0:
+            continue
+        budget = MONTHLY_BUDGETS.get(category)
+
+        if budget is None:
+            status = "-"
+        elif period == "weekly":
+            # Roughly scale the monthly budget down for a weekly check
+            weekly_budget = budget / 4
+            status = "⚠️ Over budget" if spent > weekly_budget else "OK"
+            budget = weekly_budget
+        else:
+            status = "⚠️ Over budget" if spent > budget else "OK"
+
+        budget_display = f"{budget:.2f}" if budget is not None else "-"
+        print(f"{category:<16}{spent:>10.2f}   {budget_display:>10}   {status}")
+
+    print("-" * 55)
+    print(f"{'TOTAL':<16}{grand_total:>10.2f}")
+
+
+# ------------------------------------------------------------
+# 4. MENU / PROGRAM LOOP
+# ------------------------------------------------------------
+
+def print_menu():
+    print("\n============================")
+    print("      EXPENSE TRACKER")
+    print("============================")
+    print("1. Add an expense")
+    print("2. View all expenses")
+    print("3. Weekly summary (last 7 days)")
+    print("4. Monthly summary (last 30 days)")
+    print("5. Exit")
+
+
+def main():
+    initialize_file()
+    while True:
+        print_menu()
+        choice = input("Choose an option (1-5): ").strip()
+
+        if choice == "1":
+            add_expense()
+        elif choice == "2":
+            view_all_expenses()
+        elif choice == "3":
+            summarize("weekly")
+        elif choice == "4":
+            summarize("monthly")
+        elif choice == "5":
+            print("Goodbye! Keep those expenses in check. 👋")
+            break
+        else:
+            print("⚠️  Please choose a number from 1 to 5.")
+
+
+if __name__ == "__main__":
+    main()
+    

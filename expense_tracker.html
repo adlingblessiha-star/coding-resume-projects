@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Daily Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #E3EADB;
+    --paper-line: #cdd9c1;
+    --slip: #FBF8F1;
+    --slip-edge: #e6e0cf;
+    --ink: #223129;
+    --ink-soft: #5b6b60;
+    --rule: #94ac83;
+    --rule-soft: #cdd9bd;
+    --brass: #a97a1f;
+    --stamp: #a5382f;
+    --stamp-soft: rgba(165,56,47,0.10);
+    --ok: #4d6b3f;
+    --radius: 3px;
+    --serif: 'Spectral', Georgia, serif;
+    --sans: 'Inter', system-ui, sans-serif;
+    --mono: 'IBM Plex Mono', 'Courier New', monospace;
+  }
+  *{box-sizing:border-box;}
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none !important; transition:none !important;}
+  }
+  body{
+    margin:0;
+    background:
+      repeating-linear-gradient(var(--paper) 0px, var(--paper) 27px, var(--paper-line) 28px),
+      var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    padding:32px 20px 80px;
+  }
+  .wrap{max-width:1040px;margin:0 auto;}
+
+  /* ---------- Masthead ---------- */
+  .masthead{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:16px;
+    border-bottom:3px double var(--ink);
+    padding-bottom:14px;
+    margin-bottom:28px;
+  }
+  .masthead h1{
+    font-family:var(--serif);
+    font-style:italic;
+    font-weight:600;
+    font-size:2.4rem;
+    margin:0;
+    letter-spacing:0.01em;
+  }
+  .masthead p{
+    margin:4px 0 0;
+    color:var(--ink-soft);
+    font-size:0.92rem;
+  }
+  .grand-total{
+    text-align:right;
+    font-family:var(--mono);
+  }
+  .grand-total .label{
+    display:block;
+    font-size:0.68rem;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:2px;
+  }
+  .grand-total .value{
+    font-size:1.7rem;
+    font-weight:600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Layout ---------- */
+  .board{
+    display:grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap:24px;
+    align-items:start;
+  }
+  @media (max-width: 780px){
+    .board{grid-template-columns:1fr;}
+  }
+
+  /* ---------- Entry slip (form) ---------- */
+  .slip{
+    background:var(--slip);
+    border:1px solid var(--slip-edge);
+    border-radius:var(--radius);
+    padding:22px 22px 18px;
+    box-shadow: 0 1px 0 var(--slip-edge), 0 6px 14px rgba(34,49,41,0.06);
+  }
+  .slip h2{
+    font-family:var(--serif);
+    font-size:1.05rem;
+    font-weight:600;
+    margin:0 0 4px;
+  }
+  .slip .hint{
+    font-size:0.82rem;
+    color:var(--ink-soft);
+    margin:0 0 16px;
+  }
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block;
+    font-family:var(--mono);
+    font-size:0.66rem;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:5px;
+  }
+  .field input, .field select{
+    width:100%;
+    border:none;
+    border-bottom:1px dashed var(--rule);
+    background:transparent;
+    padding:6px 2px 8px;
+    font-family:var(--sans);
+    font-size:0.95rem;
+    color:var(--ink);
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline:2px solid var(--brass);
+    outline-offset:2px;
+    border-bottom-style:solid;
+  }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .error-msg{
+    font-size:0.8rem;
+    color:var(--stamp);
+    margin:-6px 0 12px;
+    min-height:1em;
+  }
+  .record-btn{
+    width:100%;
+    background:var(--ink);
+    color:var(--slip);
+    border:none;
+    border-radius:var(--radius);
+    padding:11px;
+    font-family:var(--mono);
+    font-size:0.8rem;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    cursor:pointer;
+    transition:background 0.15s ease;
+  }
+  .record-btn:hover{background:var(--brass);}
+  .record-btn:focus-visible{outline:2px solid var(--stamp); outline-offset:2px;}
+
+  .budgets-toggle{
+    margin-top:16px;
+    background:none;
+    border:none;
+    font-family:var(--mono);
+    font-size:0.72rem;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    text-decoration:underline;
+    cursor:pointer;
+    padding:0;
+  }
+  .budgets-panel{
+    margin-top:14px;
+    padding-top:14px;
+    border-top:1px dashed var(--rule);
+    display:none;
+  }
+  .budgets-panel.open{display:block;}
+  .budget-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    margin-bottom:8px;
+    font-size:0.85rem;
+  }
+  .budget-row input{
+    width:90px;
+    border:none;
+    border-bottom:1px dashed var(--rule);
+    background:transparent;
+    padding:4px 2px;
+    font-family:var(--mono);
+    text-align:right;
+    color:var(--ink);
+  }
+  .budget-row input:focus{outline:2px solid var(--brass); outline-offset:1px;}
+
+  /* ---------- Tally tape (signature element) ---------- */
+  .tape-wrap{display:flex;justify-content:center;}
+  .tape{
+    position:relative;
+    background:var(--slip);
+    width:100%;
+    max-width:320px;
+    padding:20px 18px 30px;
+    transform:rotate(-0.6deg);
+    box-shadow:0 8px 18px rgba(34,49,41,0.10);
+    clip-path: polygon(
+      0% 0%, 100% 0%,
+      100% 94%, 94% 100%, 88% 94%, 82% 100%, 76% 94%, 70% 100%,
+      64% 94%, 58% 100%, 52% 94%, 46% 100%, 40% 94%, 34% 100%,
+      28% 94%, 22% 100%, 16% 94%, 10% 100%, 4% 94%, 0% 100%
+    );
+  }
+  .tape h3{
+    font-family:var(--mono);
+    font-size:0.7rem;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    text-align:center;
+    color:var(--ink-soft);
+    margin:0 0 4px;
+  }
+  .tape .period-label{
+    text-align:center;
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:1rem;
+    margin:0 0 14px;
+    color:var(--ink);
+  }
+  .tape-line{
+    display:flex;
+    align-items:baseline;
+    gap:6px;
+    font-family:var(--mono);
+    font-size:0.82rem;
+    margin-bottom:9px;
+    position:relative;
+  }
+  .tape-line .cat{white-space:nowrap;color:var(--ink);}
+  .tape-line .dots{
+    flex:1;
+    border-bottom:1px dotted var(--rule);
+    transform:translateY(-3px);
+  }
+  .tape-line .amt{
+    white-space:nowrap;
+    font-variant-numeric: tabular-nums;
+    font-weight:500;
+  }
+  .tape-line.over .amt{color:var(--stamp);}
+  .stamp-badge{
+    display:inline-block;
+    margin-left:6px;
+    padding:1px 5px;
+    border:1.5px solid var(--stamp);
+    color:var(--stamp);
+    font-size:0.55rem;
+    letter-spacing:0.08em;
+    transform:rotate(-6deg);
+    border-radius:2px;
+    mix-blend-mode:multiply;
+  }
+  .tape-total{
+    border-top:2px double var(--ink);
+    margin-top:14px;
+    padding-top:10px;
+    display:flex;
+    justify-content:space-between;
+    font-family:var(--mono);
+    font-weight:600;
+    font-size:0.95rem;
+  }
+  .tape-empty{
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:0.82rem;
+    padding:10px 0 4px;
+  }
+
+  /* ---------- Ledger book (table) ---------- */
+  .ledger-book{
+    margin-top:26px;
+    background:var(--slip);
+    border:1px solid var(--slip-edge);
+    border-radius:var(--radius);
+    padding:20px 22px 8px;
+  }
+  .ledger-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:12px;
+    margin-bottom:12px;
+  }
+  .ledger-head h2{
+    font-family:var(--serif);
+    font-size:1.05rem;
+    font-weight:600;
+    margin:0;
+  }
+  .tabs{display:flex;gap:4px;}
+  .tab{
+    font-family:var(--mono);
+    font-size:0.7rem;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    background:var(--paper);
+    border:1px solid var(--rule-soft);
+    border-bottom:none;
+    padding:6px 12px 5px;
+    border-radius:3px 3px 0 0;
+    cursor:pointer;
+    color:var(--ink-soft);
+  }
+  .tab.active{
+    background:var(--ink);
+    color:var(--slip);
+    border-color:var(--ink);
+  }
+  .tab:focus-visible{outline:2px solid var(--brass); outline-offset:1px;}
+
+  table{width:100%;border-collapse:collapse;}
+  thead th{
+    text-align:left;
+    font-family:var(--mono);
+    font-size:0.65rem;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    border-bottom:1px solid var(--ink);
+    padding:8px 6px;
+  }
+  thead th.num{text-align:right;}
+  tbody td{
+    padding:10px 6px;
+    border-bottom:1px solid var(--rule-soft);
+    font-size:0.88rem;
+    vertical-align:top;
+  }
+  tbody td.num{
+    text-align:right;
+    font-family:var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+  tbody tr:hover{background:rgba(148,172,131,0.08);}
+  .cat-tag{
+    display:inline-block;
+    padding:2px 8px;
+    border-radius:10px;
+    font-size:0.72rem;
+    font-weight:500;
+    color:#fff;
+  }
+  .del-btn{
+    background:none;
+    border:none;
+    color:var(--ink-soft);
+    cursor:pointer;
+    font-size:0.85rem;
+    padding:2px 6px;
+  }
+  .del-btn:hover{color:var(--stamp);}
+  .empty-state{
+    text-align:center;
+    padding:34px 10px;
+    color:var(--ink-soft);
+    font-size:0.9rem;
+  }
+  .note-cell{color:var(--ink-soft); font-size:0.82rem;}
+
+  footer{
+    text-align:center;
+    margin-top:34px;
+    color:var(--ink-soft);
+    font-size:0.78rem;
+    font-family:var(--mono);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <div>
+      <h1>The Daily Ledger</h1>
+      <p>A simple book for keeping track of where your money goes.</p>
+    </div>
+    <div class="grand-total">
+      <span class="label">Total on record</span>
+      <span class="value" id="grandTotal">0.00</span>
+    </div>
+  </div>
+
+  <div class="board">
+    <!-- Entry slip -->
+    <div class="slip">
+      <h2>Record an Expense</h2>
+      <p class="hint">Fill in the slip and add it to the ledger.</p>
+
+      <div class="field">
+        <label for="fDate">Date</label>
+        <input type="date" id="fDate">
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label for="fCategory">Category</label>
+          <select id="fCategory"></select>
+        </div>
+        <div class="field">
+          <label for="fAmount">Amount</label>
+          <input type="number" id="fAmount" placeholder="0.00" min="0" step="0.01">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fNote">Note (optional)</label>
+        <input type="text" id="fNote" placeholder="e.g. lunch with friends">
+      </div>
+
+      <p class="error-msg" id="errorMsg"></p>
+
+      <button class="record-btn" id="recordBtn">Add to Ledger</button>
+
+      <button class="budgets-toggle" id="budgetsToggle">Set monthly budgets</button>
+      <div class="budgets-panel" id="budgetsPanel"></div>
+    </div>
+
+    <!-- Tally tape -->
+    <div class="tape-wrap">
+      <div class="tape">
+        <h3>Running Tally</h3>
+        <p class="period-label" id="tapePeriodLabel">This Month</p>
+        <div id="tapeLines"></div>
+        <div class="tape-total">
+          <span>Total</span>
+          <span id="tapeTotal">0.00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ledger book -->
+  <div class="ledger-book">
+    <div class="ledger-head">
+      <h2>Ledger Book</h2>
+      <div class="tabs" id="periodTabs">
+        <button class="tab" data-period="week">This Week</button>
+        <button class="tab active" data-period="month">This Month</button>
+        <button class="tab" data-period="all">All Time</button>
+      </div>
+    </div>
+    <div id="tableWrap"></div>
+  </div>
+
+  <footer>Recorded entries are saved automatically and kept for this app only.</footer>
+</div>
+
+<script>
+(function(){
+  const CATEGORIES = ["Food","Transportation","Bills","Entertainment","Shopping","Health","Other"];
+  const CAT_COLORS = {
+    Food:"#a97a1f", Transportation:"#4c6b8a", Bills:"#223129",
+    Entertainment:"#7a4f6b", Shopping:"#5f7a52", Health:"#a5382f", Other:"#6b6558"
+  };
+  const DEFAULT_BUDGETS = {
+    Food:5000, Transportation:1500, Bills:4000, Entertainment:1000, Shopping:2000, Health:1000, Other:1000
+  };
+  const STORAGE_KEY = "ledger-data";
+
+  let state = { expenses: [], budgets: { ...DEFAULT_BUDGETS } };
+  let period = "month";
+
+  const $ = (id) => document.getElementById(id);
+
+  function fmt(n){
+    return Number(n).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  function populateCategorySelect(){
+    const sel = $("fCategory");
+    sel.innerHTML = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join("");
+  }
+
+  function buildBudgetsPanel(){
+    const panel = $("budgetsPanel");
+    panel.innerHTML = CATEGORIES.map(c => `
+      <div class="budget-row">
+        <span>${c}</span>
+        <input type="number" min="0" step="1" data-cat="${c}" class="budget-input" value="${state.budgets[c] ?? ''}">
+      </div>
+    `).join("");
+    panel.querySelectorAll(".budget-input").forEach(inp => {
+      inp.addEventListener("change", () => {
+        const val = parseFloat(inp.value);
+        state.budgets[inp.dataset.cat] = isNaN(val) ? null : val;
+        persist();
+        render();
+      });
+    });
+  }
+
+  async function load(){
+    try{
+      const result = await window.storage.get(STORAGE_KEY, false);
+      if(result && result.value){
+        const parsed = JSON.parse(result.value);
+        state.expenses = Array.isArray(parsed.expenses) ? parsed.expenses : [];
+        state.budgets = parsed.budgets && typeof parsed.budgets === "object"
+          ? { ...DEFAULT_BUDGETS, ...parsed.budgets }
+          : { ...DEFAULT_BUDGETS };
+      }
+    }catch(e){
+      // No saved ledger yet, or storage unavailable — start fresh.
+      state = { expenses: [], budgets: { ...DEFAULT_BUDGETS } };
+    }
+  }
+
+  async function persist(){
+    try{
+      await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
+    }catch(e){
+      console.error("Could not save ledger:", e);
+    }
+  }
+
+  function withinPeriod(dateStr){
+    const d = new Date(dateStr + "T00:00:00");
+    const now = new Date();
+    if(period === "all") return true;
+    if(period === "week"){
+      const cutoff = new Date(now); cutoff.setDate(now.getDate()-7);
+      return d >= cutoff;
+    }
+    // month = last 30 days
+    const cutoff = new Date(now); cutoff.setDate(now.getDate()-30);
+    return d >= cutoff;
+  }
+
+  function periodLabel(){
+    return period === "week" ? "This Week" : period === "month" ? "This Month" : "All Time";
+  }
+
+  function monthlyBudgetFor(cat){
+    const b = state.budgets[cat];
+    if(b === null || b === undefined || b === "") return null;
+    if(period === "week") return b/4;
+    return b; // month & all use full monthly figure as the reference line
+  }
+
+  function render(){
+    renderGrandTotal();
+    renderTape();
+    renderTable();
+  }
+
+  function renderGrandTotal(){
+    const total = state.expenses.reduce((s,e)=>s+e.amount,0);
+    $("grandTotal").textContent = fmt(total);
+  }
+
+  function renderTape(){
+    $("tapePeriodLabel").textContent = periodLabel();
+    const filtered = state.expenses.filter(e => withinPeriod(e.date));
+    const totalsByCat = {};
+    CATEGORIES.forEach(c => totalsByCat[c] = 0);
+    filtered.forEach(e => totalsByCat[e.category] = (totalsByCat[e.category]||0) + e.amount);
+
+    const linesHtml = [];
+    let grand = 0;
+    CATEGORIES.forEach(c => {
+      const spent = totalsByCat[c];
+      if(spent <= 0) return;
+      grand += spent;
+      const budget = monthlyBudgetFor(c);
+      const over = budget !== null && spent > budget;
+      linesHtml.push(`
+        <div class="tape-line ${over ? 'over' : ''}">
+          <span class="cat">${c}</span>
+          <span class="dots"></span>
+          <span class="amt">${fmt(spent)}${over ? '<span class="stamp-badge">OVER</span>' : ''}</span>
+        </div>
+      `);
+    });
+
+    $("tapeLines").innerHTML = linesHtml.length ? linesHtml.join("")
+      : `<p class="tape-empty">Nothing recorded for this period yet.</p>`;
+    $("tapeTotal").textContent = fmt(grand);
+  }
+
+  function renderTable(){
+    const filtered = state.expenses
+      .filter(e => withinPeriod(e.date))
+      .sort((a,b) => b.date.localeCompare(a.date) || b.id - a.id);
+
+    if(filtered.length === 0){
+      $("tableWrap").innerHTML = `<p class="empty-state">Nothing recorded yet${period !== 'all' ? ' for this period' : ''}. Add your first entry using the slip above to start the ledger.</p>`;
+      return;
+    }
+
+    const rows = filtered.map(e => `
+      <tr>
+        <td>${e.date}</td>
+        <td><span class="cat-tag" style="background:${CAT_COLORS[e.category]||'#6b6558'}">${e.category}</span></td>
+        <td class="num">${fmt(e.amount)}</td>
+        <td class="note-cell">${e.note ? escapeHtml(e.note) : '—'}</td>
+        <td><button class="del-btn" data-id="${e.id}" aria-label="Delete entry">✕</button></td>
+      </tr>
+    `).join("");
+
+    $("tableWrap").innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Category</th><th class="num">Amount</th><th>Note</th><th></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+
+    $("tableWrap").querySelectorAll(".del-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = Number(btn.dataset.id);
+        state.expenses = state.expenses.filter(e => e.id !== id);
+        persist();
+        render();
+      });
+    });
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function handleAdd(){
+    const dateVal = $("fDate").value || new Date().toISOString().slice(0,10);
+    const category = $("fCategory").value;
+    const amountVal = parseFloat($("fAmount").value);
+    const note = $("fNote").value.trim();
+    const errorEl = $("errorMsg");
+
+    if(isNaN(amountVal) || amountVal <= 0){
+      errorEl.textContent = "Enter an amount greater than zero to record this.";
+      return;
+    }
+    errorEl.textContent = "";
+
+    state.expenses.push({
+      id: Date.now(),
+      date: dateVal,
+      category, amount: amountVal, note
+    });
+    persist();
+    $("fAmount").value = "";
+    $("fNote").value = "";
+    render();
+  }
+
+  function wireEvents(){
+    $("recordBtn").addEventListener("click", handleAdd);
+    $("budgetsToggle").addEventListener("click", () => {
+      $("budgetsPanel").classList.toggle("open");
+    });
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        period = tab.dataset.period;
+        render();
+      });
+    });
+  }
+
+  async function init(){
+    $("fDate").value = new Date().toISOString().slice(0,10);
+    populateCategorySelect();
+    await load();
+    buildBudgetsPanel();
+    wireEvents();
+    render();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

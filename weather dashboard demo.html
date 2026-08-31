@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sunny Side 🌤️ — Weather Dashboard</title>
+
+<!-- Google Fonts: Fredoka is round & bubbly for headings (the "cute" signature font),
+     Nunito stays as the easy-to-read body font -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+  /* ============================================================
+     DESIGN TOKENS
+     A saturated-but-soft pastel palette, extra-round corners, and
+     tinted "candy" shadows are what push this from "pastel" to "cute".
+     ============================================================ */
+  :root{
+    --lavender:   #EFE3FB;
+    --pink:       #FFD3E6;
+    --coral:      #FFC2C2;
+    --mint:       #CFF7E3;
+    --butter:     #FFEFB0;
+    --sky:        #C9EAFF;
+    --plum:       #5B4470;      /* main text color, soft plum instead of harsh black */
+    --plum-soft:  #9585AC;      /* secondary text */
+    --white:      #FFFFFF;
+    --card-radius: 32px;
+    --shadow-soft: 0 14px 34px rgba(190, 150, 200, 0.28);
+    --shadow-tiny: 0 6px 16px rgba(190, 150, 200, 0.22);
+    --shadow-pop:  0 8px 0 rgba(190, 150, 200, 0.28); /* gives buttons a squishy "candy button" edge */
+  }
+
+  * { box-sizing: border-box; }
+
+  body{
+    margin: 0;
+    min-height: 100vh;
+    font-family: 'Nunito', sans-serif;
+    color: var(--plum);
+    /* Soft multi-pastel gradient backdrop -- changes per weather mood via JS */
+    background: linear-gradient(160deg, var(--lavender) 0%, var(--sky) 45%, var(--pink) 100%);
+    background-attachment: fixed;
+    transition: background 1s ease;
+    padding: 24px 16px 60px;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, .display-font{
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  /* ============================================================
+     FLOATING SPARKLE DECORATIONS
+     A handful of little emoji sparkles drift slowly in the
+     background -- purely decorative, purely for charm.
+     ============================================================ */
+  .sparkle-field{
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 0;
+  }
+  .sparkle{
+    position: absolute;
+    opacity: 0.55;
+    animation: drift 10s ease-in-out infinite;
+    filter: saturate(1.1);
+  }
+  @keyframes drift{
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50%      { transform: translateY(-18px) rotate(12deg); }
+  }
+
+  .app{
+    max-width: 920px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ============================================================
+     TOP BAR
+     ============================================================ */
+  .top-bar{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+  }
+
+  .brand{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .brand-emoji{
+    font-size: 34px;
+    display: inline-block;
+    animation: wiggle 3.5s ease-in-out infinite;
+    transform-origin: 70% 70%;
+  }
+  @keyframes wiggle{
+    0%, 100% { transform: rotate(0deg); }
+    10%      { transform: rotate(-8deg); }
+    20%      { transform: rotate(8deg); }
+    30%      { transform: rotate(-4deg); }
+    40%      { transform: rotate(0deg); }
+  }
+
+  .brand h1{
+    font-size: 24px;
+    letter-spacing: 0.02em;
+  }
+  .brand p{ margin: 2px 0 0; font-size: 13px; color: var(--plum-soft); font-weight: 700; }
+
+  /* Search + location controls */
+  .search-row{
+    display: flex;
+    gap: 8px;
+    flex: 1 1 320px;
+    max-width: 430px;
+  }
+
+  .search-row input{
+    flex: 1;
+    padding: 13px 20px;
+    border-radius: 999px;
+    border: 3px solid var(--white);
+    outline: none;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    background: var(--white);
+    box-shadow: var(--shadow-tiny);
+    color: var(--plum);
+    transition: border-color .2s ease, transform .2s ease;
+  }
+  .search-row input:focus{
+    border-color: var(--coral);
+    transform: scale(1.02);
+  }
+  .search-row input::placeholder{ color: #C6B4DC; }
+
+  .icon-btn{
+    border: none;
+    cursor: pointer;
+    border-radius: 999px;
+    padding: 12px 18px;
+    font-size: 15px;
+    font-weight: 800;
+    font-family: 'Nunito', sans-serif;
+    background: var(--white);
+    color: var(--plum);
+    box-shadow: var(--shadow-pop);
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  /* "Squishy candy button" press effect -- pushes down onto its own shadow */
+  .icon-btn:hover{ transform: translateY(-2px); }
+  .icon-btn:active{
+    transform: translateY(4px);
+    box-shadow: 0 3px 0 rgba(190, 150, 200, 0.28);
+  }
+
+  .icon-btn.primary{
+    background: linear-gradient(135deg, #FFB6D5, #FFC9A3);
+    color: var(--white);
+  }
+
+  /* ============================================================
+     HERO CARD — the star of the dashboard
+     ============================================================ */
+  .hero-card{
+    background: var(--white);
+    border-radius: var(--card-radius);
+    box-shadow: var(--shadow-soft);
+    padding: 34px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 20px;
+    position: relative;
+    overflow: hidden;
+    border: 3px dashed rgba(255, 195, 220, 0.6); /* playful dashed candy border */
+  }
+
+  /* Soft polka-dot pattern tucked in the corner of the hero card */
+  .hero-card::before{
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 200px; height: 200px;
+    background-image: radial-gradient(circle, rgba(255,211,230,0.6) 8px, transparent 9px);
+    background-size: 26px 26px;
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .hero-text .place{
+    font-size: 15px;
+    color: var(--plum-soft);
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .hero-text .temp{
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 78px;
+    line-height: 1;
+    margin: 6px 0 0;
+    display: flex;
+    align-items: flex-start;
+    background: linear-gradient(135deg, #FF9FC0, #FFC98A);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .hero-text .temp sup{
+    font-size: 30px;
+    margin-top: 10px;
+  }
+
+  .hero-text .condition{
+    font-size: 19px;
+    font-weight: 800;
+    margin-top: 6px;
+    color: var(--plum);
+  }
+
+  /* Speech-bubble style tip, as if the weather buddy is chatting with you */
+  .friendly-msg{
+    margin-top: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--plum);
+    background: var(--butter);
+    display: inline-block;
+    padding: 10px 16px;
+    border-radius: 18px;
+    position: relative;
+  }
+  .friendly-msg::after{
+    content: '';
+    position: absolute;
+    left: 22px;
+    bottom: -8px;
+    width: 16px; height: 16px;
+    background: var(--butter);
+    clip-path: polygon(0 0, 100% 0, 0 100%);
+  }
+
+  .buddy-wrap{
+    width: 180px;
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Gentle bouncy float for the weather buddy illustration */
+  @keyframes float{
+    0%, 100% { transform: translateY(0px) rotate(-2deg); }
+    50%      { transform: translateY(-10px) rotate(2deg); }
+  }
+  #weatherBuddy{ animation: float 3.2s ease-in-out infinite; }
+
+  @media (prefers-reduced-motion: reduce){
+    #weatherBuddy, .brand-emoji, .sparkle{ animation: none; }
+    .icon-btn{ transition: none; }
+  }
+
+  /* ============================================================
+     STATS GRID — humidity, wind, etc as bubbly pill cards
+     ============================================================ */
+  .stats-grid{
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 22px;
+  }
+
+  .stat-card{
+    background: var(--white);
+    border-radius: 24px;
+    padding: 20px 14px;
+    text-align: center;
+    box-shadow: var(--shadow-tiny);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .stat-card:hover{
+    transform: translateY(-4px) rotate(-1deg) scale(1.03);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .stat-card .stat-emoji{ font-size: 28px; }
+  .stat-card .stat-value{
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 21px;
+    margin-top: 4px;
+  }
+  .stat-card .stat-label{
+    font-size: 12px;
+    color: var(--plum-soft);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  /* ============================================================
+     FORECAST STRIP
+     ============================================================ */
+  .forecast-section{ margin-top: 30px; }
+  .forecast-section h2{
+    font-size: 18px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .forecast-strip{
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+
+  .forecast-chip{
+    flex: 0 0 auto;
+    width: 88px;
+    background: var(--white);
+    border-radius: 20px;
+    padding: 16px 8px;
+    text-align: center;
+    box-shadow: var(--shadow-tiny);
+    transition: transform .15s ease;
+  }
+  .forecast-chip:hover{ transform: translateY(-3px) scale(1.05); }
+  .forecast-chip .fc-time{ font-size: 12px; color: var(--plum-soft); font-weight: 800; }
+  .forecast-chip .fc-emoji{ font-size: 25px; margin: 6px 0; }
+  .forecast-chip .fc-temp{ font-size: 14px; font-weight: 800; }
+
+  /* Status / loading / error messaging */
+  .status-msg{
+    text-align: center;
+    padding: 50px 20px;
+    color: var(--plum-soft);
+    font-weight: 800;
+    font-size: 15px;
+  }
+  .status-msg .bounce-emoji{
+    display: inline-block;
+    font-size: 40px;
+    animation: float 1.4s ease-in-out infinite;
+    margin-bottom: 10px;
+  }
+
+  footer{
+    text-align: center;
+    margin-top: 40px;
+    font-size: 12px;
+    color: var(--plum-soft);
+    font-weight: 700;
+  }
+
+  /* ============================================================
+     RESPONSIVE — stack nicely on mobile
+     ============================================================ */
+  @media (max-width: 640px){
+    .hero-card{ grid-template-columns: 1fr; text-align: center; padding: 28px 22px; }
+    .hero-text .place, .hero-text .temp{ justify-content: center; }
+    .friendly-msg::after{ left: 50%; margin-left: -8px; }
+    .buddy-wrap{ margin: 0 auto; width: 140px; height: 140px; }
+    .stats-grid{ grid-template-columns: repeat(2, 1fr); }
+    .search-row{ max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Decorative floating sparkles, purely for cuteness -->
+<div class="sparkle-field" id="sparkleField"></div>
+
+<div class="app">
+
+  <!-- ===================== TOP BAR: brand + search ===================== -->
+  <div class="top-bar">
+    <div class="brand">
+      <span class="brand-emoji">🌤️</span>
+      <div>
+        <h1>Sunny Side</h1>
+        <p>your cheerful little weather buddy ✨</p>
+      </div>
+    </div>
+
+    <div class="search-row">
+      <input id="cityInput" type="text" placeholder="🔍 Search a city… (e.g. Chennai)" />
+      <button class="icon-btn primary" id="searchBtn">Search</button>
+      <button class="icon-btn" id="locateBtn" title="Use my location">📍</button>
+    </div>
+  </div>
+
+  <!-- ===================== MAIN DASHBOARD ===================== -->
+  <div id="dashboard">
+    <div class="status-msg"><span class="bounce-emoji">🌈</span><br/>Loading today's weather…</div>
+  </div>
+
+  <footer>Data from Open&#8209;Meteo · Made with 💕 for a brighter forecast</footer>
+</div>
+
+<script>
+/* =====================================================================
+   SUNNY SIDE — cute weather dashboard
+   Data source: Open-Meteo (https://open-meteo.com) — a free weather API
+   that requires NO API key, which keeps this demo simple to run anywhere.
+   ===================================================================== */
+
+// Grab the DOM containers we'll fill in with live data
+const dashboard  = document.getElementById('dashboard');
+const cityInput  = document.getElementById('cityInput');
+const searchBtn  = document.getElementById('searchBtn');
+const locateBtn  = document.getElementById('locateBtn');
+const sparkleField = document.getElementById('sparkleField');
+
+/**
+ * Scatters a handful of decorative sparkle/heart/star emojis around the
+ * page background. Pure charm -- no data, just vibes. Runs once on load.
+ */
+function scatterSparkles(){
+  const glyphs = ['✨', '💫', '⭐', '💗', '🌸'];
+  const count = 14;
+  let html = '';
+  for (let i = 0; i < count; i++){
+    const glyph = glyphs[Math.floor(Math.random() * glyphs.length)];
+    const top = Math.random() * 100;      // vh percentage
+    const left = Math.random() * 100;     // vw percentage
+    const size = 14 + Math.random() * 16; // px
+    const delay = Math.random() * 6;      // stagger the drift animation
+    const duration = 8 + Math.random() * 6;
+    html += `<span class="sparkle" style="
+      top:${top}vh; left:${left}vw; font-size:${size}px;
+      animation-delay:${delay}s; animation-duration:${duration}s;
+    ">${glyph}</span>`;
+  }
+  sparkleField.innerHTML = html;
+}
+scatterSparkles();
+
+/**
+ * Maps Open-Meteo's numeric "weather codes" to something we can design
+ * around: an emoji, a short label, a mood (used for buddy + background),
+ * and a cheerful little tip for the user.
+ * Reference: https://open-meteo.com/en/docs (WMO Weather interpretation codes)
+ */
+function describeWeather(code){
+  const table = {
+    0:  { label: 'Clear Sky',        emoji: '☀️', mood: 'sunny',  tip: 'Perfect day for sunglasses! 😎' },
+    1:  { label: 'Mostly Clear',     emoji: '🌤️', mood: 'sunny',  tip: 'Bright skies ahead, enjoy it!' },
+    2:  { label: 'Partly Cloudy',    emoji: '⛅',  mood: 'cloudy', tip: 'A little cloud cover, still lovely.' },
+    3:  { label: 'Overcast',         emoji: '☁️',  mood: 'cloudy', tip: 'Cozy, grey-sky kind of day.' },
+    45: { label: 'Foggy',            emoji: '🌫️', mood: 'fog',    tip: 'Misty out there — drive gently.' },
+    48: { label: 'Icy Fog',          emoji: '🌫️', mood: 'fog',    tip: 'Frosty fog — bundle up!' },
+    51: { label: 'Light Drizzle',    emoji: '🌦️', mood: 'rain',   tip: 'A light umbrella might help.' },
+    53: { label: 'Drizzle',          emoji: '🌦️', mood: 'rain',   tip: 'Gentle drizzle — grab a hoodie.' },
+    55: { label: 'Heavy Drizzle',    emoji: '🌧️', mood: 'rain',   tip: 'Steady drizzle, umbrella time!' },
+    61: { label: 'Light Rain',       emoji: '🌦️', mood: 'rain',   tip: 'A little rain is falling.' },
+    63: { label: 'Rain',             emoji: '🌧️', mood: 'rain',   tip: "Don't forget your umbrella! ☂️" },
+    65: { label: 'Heavy Rain',       emoji: '🌧️', mood: 'rain',   tip: "It's pouring — stay dry out there!" },
+    71: { label: 'Light Snow',       emoji: '🌨️', mood: 'snow',   tip: 'Snowflakes falling gently ❄️' },
+    73: { label: 'Snow',             emoji: '❄️',  mood: 'snow',   tip: 'Snowy day — perfect for cocoa.' },
+    75: { label: 'Heavy Snow',       emoji: '❄️',  mood: 'snow',   tip: 'Big snowfall, wrap up warm!' },
+    80: { label: 'Rain Showers',     emoji: '🌦️', mood: 'rain',   tip: 'Passing showers, keep an umbrella handy.' },
+    81: { label: 'Rain Showers',     emoji: '🌧️', mood: 'rain',   tip: 'Showers on and off today.' },
+    82: { label: 'Violent Showers',  emoji: '⛈️', mood: 'storm',  tip: 'Heavy showers — stay cozy indoors.' },
+    95: { label: 'Thunderstorm',     emoji: '⛈️', mood: 'storm',  tip: 'Thunder rumbling — best stay inside!' },
+    96: { label: 'Storm w/ Hail',    emoji: '⛈️', mood: 'storm',  tip: 'Hail possible — take care outside.' },
+    99: { label: 'Storm w/ Hail',    emoji: '⛈️', mood: 'storm',  tip: 'Big storm brewing — stay safe!' },
+  };
+  return table[code] || { label: 'Mild Weather', emoji: '🌥️', mood: 'cloudy', tip: 'Have a wonderful day!' };
+}
+
+/** Pastel gradients keyed to the weather "mood", used as the page background. */
+const moodGradients = {
+  sunny:  'linear-gradient(160deg, #FFEFB0 0%, #FFD3E6 55%, #C9EAFF 100%)',
+  cloudy: 'linear-gradient(160deg, #EFE3FB 0%, #C9EAFF 50%, #E4E4F7 100%)',
+  rain:   'linear-gradient(160deg, #C9EAFF 0%, #D6E9F7 50%, #C7DCEE 100%)',
+  snow:   'linear-gradient(160deg, #F3F8FF 0%, #E8F2FF 55%, #DCEBFF 100%)',
+  fog:    'linear-gradient(160deg, #E9E9EF 0%, #DDE3E8 55%, #D8D8E4 100%)',
+  storm:  'linear-gradient(160deg, #DCCFF2 0%, #C9C3E8 55%, #B9C6E0 100%)',
+};
+
+/**
+ * Draws a cute face (big sparkly eyes, rosy cheeks, a smile) centered at
+ * (cx, cy). Every weather character below places one of these onto its
+ * own body shape, so all the characters share the same "cute" expression
+ * even though their bodies look completely different.
+ *
+ * @param {number} cx - horizontal center of the face
+ * @param {number} cy - vertical center of the face
+ * @param {number} spread - horizontal distance from center to each eye
+ * @param {string} inkColor - color used for eyes + smile line
+ */
+function drawFace(cx, cy, spread = 14, inkColor = '#5B4470'){
+  const leftX = cx - spread, rightX = cx + spread;
+  return `
+    <!-- rosy cheeks -->
+    <ellipse cx="${leftX - 6}" cy="${cy + 10}" rx="6.5" ry="4.5" fill="#FFB3C6" opacity="0.85" />
+    <ellipse cx="${rightX + 6}" cy="${cy + 10}" rx="6.5" ry="4.5" fill="#FFB3C6" opacity="0.85" />
+    <!-- big sparkly eyes -->
+    <circle cx="${leftX}" cy="${cy}" r="5.5" fill="${inkColor}" />
+    <circle cx="${rightX}" cy="${cy}" r="5.5" fill="${inkColor}" />
+    <circle cx="${leftX + 2}" cy="${cy - 2}" r="1.7" fill="#FFFFFF" />
+    <circle cx="${rightX + 2}" cy="${cy - 2}" r="1.7" fill="#FFFFFF" />
+    <!-- happy smile -->
+    <path d="M${cx - 14} ${cy + 16} Q${cx} ${cy + 27} ${cx + 14} ${cy + 16}"
+          stroke="${inkColor}" stroke-width="3.5" fill="none" stroke-linecap="round" />
+  `;
+}
+
+/**
+ * Builds the SVG "weather buddy" illustration. Rather than one blob with
+ * swapped accessories, each mood gets its OWN character shape -- a sun,
+ * a cloud, a raindrop, a snowball, a fog puff, or a storm cloud -- so the
+ * dashboard's mascot really looks like the weather it represents.
+ */
+function buildBuddySVG(mood){
+  const builders = {
+    sunny: buildSunCharacter,
+    cloudy: buildCloudCharacter,
+    rain: buildRaindropCharacter,
+    snow: buildSnowCharacter,
+    fog: buildFogCharacter,
+    storm: buildStormCharacter,
+  };
+  const build = builders[mood] || buildCloudCharacter;
+  return `
+    <svg id="weatherBuddy" width="160" height="160" viewBox="0 0 120 145" xmlns="http://www.w3.org/2000/svg">
+      ${build()}
+    </svg>`;
+}
+
+/** ☀️ Sunny: a round golden sun with rounded rays and a big grin. */
+function buildSunCharacter(){
+  // Eight rounded-triangle rays spaced evenly around the sun's body
+  let rays = '';
+  const rayCount = 8;
+  for (let i = 0; i < rayCount; i++){
+    const angle = (360 / rayCount) * i;
+    rays += `<g transform="rotate(${angle} 60 72)">
+      <path d="M60 20 L67 34 L53 34 Z" fill="#FFC94D" />
+    </g>`;
+  }
+  return `
+    <g>${rays}</g>
+    <circle cx="60" cy="72" r="38" fill="#FFD97A" />
+    ${drawFace(60, 68, 13)}
+  `;
+}
+
+/** ☁️ Cloudy: a puffy white-and-lavender cloud shape. */
+function buildCloudCharacter(){
+  return `
+    <!-- layered circles/ellipses build up the classic "cloud" silhouette -->
+    <ellipse cx="60" cy="88" rx="46" ry="24" fill="#F4F1FC" />
+    <circle cx="32" cy="76" r="20" fill="#F4F1FC" />
+    <circle cx="58" cy="62" r="26" fill="#FFFFFF" />
+    <circle cx="86" cy="76" r="21" fill="#F4F1FC" />
+    ${drawFace(60, 76, 14)}
+  `;
+}
+
+/** 🌧️ Rain: a friendly teardrop-shaped raindrop, with a couple of drips nearby. */
+function buildRaindropCharacter(){
+  return `
+    <!-- classic raindrop silhouette: pointed top, rounded bottom -->
+    <path d="M60 14 C82 46 92 66 92 84 C92 108 78 122 60 122
+             C42 122 28 108 28 84 C28 66 38 46 60 14 Z"
+          fill="#8FC4EE" />
+    <!-- small shine highlight -->
+    <ellipse cx="46" cy="70" rx="6" ry="10" fill="#FFFFFF" opacity="0.35" />
+    ${drawFace(60, 86, 13, '#2F4D66')}
+    <!-- little companion droplets falling beside it -->
+    <g fill="#BBDDF6">
+      <ellipse cx="18" cy="118" rx="4" ry="6" />
+      <ellipse cx="102" cy="112" rx="4" ry="6" />
+    </g>
+  `;
+}
+
+/** ❄️ Snow: a round snowball character wearing a tiny knit hat. */
+function buildSnowCharacter(){
+  return `
+    <circle cx="60" cy="76" r="40" fill="#EAF5FF" />
+    <!-- tiny knit hat -->
+    <path d="M32 46 Q60 18 88 46 Z" fill="#FF9FC0" />
+    <rect x="30" y="44" width="60" height="10" rx="5" fill="#FFC9DE" />
+    <circle cx="60" cy="20" r="6" fill="#FFFFFF" />
+    ${drawFace(60, 78, 13, '#4A7195')}
+    <!-- drifting snowflakes -->
+    <g fill="#BFDCF7">
+      <circle cx="16" cy="60" r="3" />
+      <circle cx="104" cy="54" r="3" />
+      <circle cx="14" cy="100" r="2.5" />
+    </g>
+  `;
+}
+
+/** 🌫️ Fog: a soft, hazy cloud puff with translucent mist bands. */
+function buildFogCharacter(){
+  return `
+    <ellipse cx="60" cy="80" rx="48" ry="30" fill="#E4E6ED" />
+    <circle cx="42" cy="66" r="20" fill="#EDEEF3" />
+    <circle cx="80" cy="66" r="18" fill="#EDEEF3" />
+    ${drawFace(60, 80, 14, '#7B818F')}
+    <!-- horizontal mist lines drifting past -->
+    <g stroke="#C9CEDA" stroke-width="4.5" stroke-linecap="round" opacity="0.8">
+      <line x1="8" y1="108" x2="46" y2="108" />
+      <line x1="58" y1="112" x2="96" y2="112" />
+      <line x1="20" y1="118" x2="52" y2="118" />
+    </g>
+  `;
+}
+
+/** ⛈️ Storm: a moody dark cloud with a lightning bolt and a determined face. */
+function buildStormCharacter(){
+  return `
+    <ellipse cx="60" cy="80" rx="46" ry="26" fill="#A79BC9" />
+    <circle cx="36" cy="68" r="19" fill="#B3A7D1" />
+    <circle cx="82" cy="68" r="19" fill="#B3A7D1" />
+    ${drawFace(60, 78, 14, '#3E2F55')}
+    <!-- lightning bolt streaking down from the cloud -->
+    <polygon points="64,104 78,104 62,132 68,110 54,110" fill="#FFC94D" />
+  `;
+}
+
+/** Formats an ISO hour string like "2026-08-29T14:00" into "2 PM". */
+function formatHour(isoString){
+  const d = new Date(isoString);
+  let h = d.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h} ${ampm}`;
+}
+
+/** Renders the full dashboard markup once we have weather + place data. */
+function renderDashboard(place, current, hourly){
+  const weather = describeWeather(current.weathercode);
+
+  // Set the pastel background to match the current mood
+  document.body.style.background = moodGradients[weather.mood];
+
+  // Build the next 6 upcoming hourly forecast chips
+  const nowIndex = hourly.time.findIndex(t => new Date(t) >= new Date());
+  const chips = [];
+  for (let i = nowIndex; i < nowIndex + 6 && i < hourly.time.length; i++){
+    const hw = describeWeather(hourly.weathercode[i]);
+    chips.push(`
+      <div class="forecast-chip">
+        <div class="fc-time">${formatHour(hourly.time[i])}</div>
+        <div class="fc-emoji">${hw.emoji}</div>
+        <div class="fc-temp">${Math.round(hourly.temperature_2m[i])}°</div>
+      </div>`);
+  }
+
+  const currentHumidity = hourly.relativehumidity_2m[nowIndex] ?? '--';
+
+  dashboard.innerHTML = `
+    <!-- HERO: place name, big temperature, weather buddy illustration -->
+    <div class="hero-card">
+      <div class="hero-text">
+        <div class="place">📍 ${place}</div>
+        <div class="temp">${Math.round(current.temperature)}<sup>°C</sup></div>
+        <div class="condition">${weather.emoji} ${weather.label}</div>
+        <div class="friendly-msg">${weather.tip}</div>
+      </div>
+      <div class="buddy-wrap">${buildBuddySVG(weather.mood)}</div>
+    </div>
+
+    <!-- STATS: quick-glance bubbly pill cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-emoji">💧</div>
+        <div class="stat-value">${currentHumidity}%</div>
+        <div class="stat-label">Humidity</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-emoji">🌬️</div>
+        <div class="stat-value">${Math.round(current.windspeed)} km/h</div>
+        <div class="stat-label">Wind</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-emoji">🧭</div>
+        <div class="stat-value">${current.winddirection}°</div>
+        <div class="stat-label">Direction</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-emoji">🕒</div>
+        <div class="stat-value">${formatHour(current.time)}</div>
+        <div class="stat-label">Updated</div>
+      </div>
+    </div>
+
+    <!-- HOURLY FORECAST STRIP -->
+    <div class="forecast-section">
+      <h2>Next few hours <span>✨</span></h2>
+      <div class="forecast-strip">${chips.join('')}</div>
+    </div>
+  `;
+}
+
+/** Shows a friendly loading or error message in place of the dashboard. */
+function showStatus(message, emoji){
+  dashboard.innerHTML = `
+    <div class="status-msg">
+      <span class="bounce-emoji">${emoji || '🌈'}</span><br/>
+      ${message}
+    </div>`;
+}
+
+/**
+ * Builds a small block of realistic-looking sample data so the dashboard
+ * still has something charming to show if the live API can't be reached
+ * (e.g. blocked network, offline demo, opened via file:// in a strict browser).
+ */
+function buildDemoData(){
+  const now = new Date();
+  const hourly = { time: [], temperature_2m: [], relativehumidity_2m: [], weathercode: [] };
+  for (let i = 0; i < 8; i++){
+    const t = new Date(now.getTime() + i * 3600 * 1000);
+    hourly.time.push(t.toISOString().slice(0, 16));
+    hourly.temperature_2m.push(28 + Math.round(Math.sin(i) * 2));
+    hourly.relativehumidity_2m.push(60 + Math.round(Math.cos(i) * 5));
+    hourly.weathercode.push([0, 1, 2, 3][i % 4]);
+  }
+  const current = {
+    temperature: 29, weathercode: 1, windspeed: 12,
+    winddirection: 180, time: now.toISOString().slice(0, 16),
+  };
+  return { current, hourly };
+}
+
+/**
+ * Fetches a URL and safely parses it as JSON, throwing a clear, readable
+ * error instead of a cryptic SyntaxError if the response isn't actually
+ * JSON. This happens most often when /api/* is served by the wrong thing
+ * (e.g. a static file server without Flask running), which returns an
+ * HTML 404 page instead of real data.
+ */
+async function fetchJSON(url){
+  const res = await fetch(url);
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')){
+    throw new Error(
+      `Expected JSON from ${url} but got "${contentType || 'unknown'}" (status ${res.status}). ` +
+      `Make sure the Flask app (app.py) is running and you're viewing it at that server's own address.`
+    );
+  }
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Request to ${url} failed (status ${res.status}).`);
+  return data;
+}
+
+/**
+ * Given latitude/longitude and a display name, fetches current + hourly
+ * weather from our Flask backend (which itself calls Open-Meteo) and
+ * renders the dashboard. If the request fails for any reason, we fall
+ * back to demo data so the page still works.
+ */
+async function loadWeather(lat, lon, placeName){
+  showStatus('Fetching fresh weather for you…', '🌈');
+  try{
+    // Calls OUR OWN backend (/api/weather) rather than Open-Meteo directly.
+    // The Flask server fetches from Open-Meteo on our behalf, which avoids
+    // browser CORS restrictions entirely.
+    const data = await fetchJSON(`/api/weather?lat=${lat}&lon=${lon}`);
+    renderDashboard(placeName, data.current_weather, data.hourly);
+  }catch(err){
+    console.warn('Live weather fetch failed, showing demo data instead:', err);
+    const demo = buildDemoData();
+    renderDashboard(placeName + ' (demo data)', demo.current, demo.hourly);
+  }
+}
+
+/** Looks up a city name via our Flask backend's /api/geocode route. */
+async function searchCity(name){
+  showStatus(`Looking for "${name}"…`, '🔎');
+  try{
+    // Calls OUR OWN backend (/api/geocode) rather than Open-Meteo directly.
+    const data = await fetchJSON(`/api/geocode?name=${encodeURIComponent(name)}`);
+    if (!data.results || data.results.length === 0){
+      showStatus(`Hmm, couldn't find "${name}". Try another city name!`, '🗺️');
+      return;
+    }
+    const place = data.results[0];
+    const label = [place.name, place.admin1, place.country].filter(Boolean).join(', ');
+    loadWeather(place.latitude, place.longitude, label);
+  }catch(err){
+    console.warn('Geocoding fetch failed, showing demo data instead:', err);
+    // Even the city lookup can be blocked on restrictive networks --
+    // fall back to demo data for the searched name rather than a dead end.
+    const demo = buildDemoData();
+    renderDashboard(name + ' (demo data)', demo.current, demo.hourly);
+  }
+}
+
+/** Uses the browser's geolocation to fetch weather for the user's current spot. */
+function useMyLocation(){
+  if (!navigator.geolocation){
+    showStatus('Location access is not available in this browser.', '🙈');
+    return;
+  }
+  showStatus('Finding your location…', '📍');
+  navigator.geolocation.getCurrentPosition(
+    pos => loadWeather(pos.coords.latitude, pos.coords.longitude, 'Your Location'),
+    ()  => showStatus('Could not access your location — try searching a city instead!', '🏙️')
+  );
+}
+
+// ---- Wire up interactions ----
+searchBtn.addEventListener('click', () => {
+  const value = cityInput.value.trim();
+  if (value) searchCity(value);
+});
+cityInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') searchBtn.click();
+});
+locateBtn.addEventListener('click', useMyLocation);
+
+// ---- Initial load: try the user's location, fall back to a default city ----
+if (navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(
+    pos => loadWeather(pos.coords.latitude, pos.coords.longitude, 'Your Location'),
+    ()  => searchCity('Chennai') // graceful fallback if permission is denied
+  );
+} else {
+  searchCity('Chennai');
+}
+</script>
+
+</body>
+</html>
